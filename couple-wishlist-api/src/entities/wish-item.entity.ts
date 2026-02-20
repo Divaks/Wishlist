@@ -1,0 +1,35 @@
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne } from 'typeorm';
+import { User } from './user.entity';
+
+export enum Priority {
+  LOW = 'low',
+  MEDIUM = 'medium',
+  HIGH = 'high',
+}
+
+@Entity()
+export class WishItem {
+  @PrimaryGeneratedColumn()
+  id: string;
+
+  @Column()
+  title: string;
+
+  @Column({ nullable: true })
+  description: string;
+
+  @Column('decimal', { precision: 10, scale: 2, default: 0 })
+  price: number;
+
+  @Column({ nullable: true })
+  link: string;
+
+  @Column({ type: 'enum', enum: Priority, default: Priority.MEDIUM })
+  priority: Priority;
+
+  @Column({ default: false })
+  isInCart: boolean;
+
+  @ManyToOne(() => User, (user) => user.wishlist)
+  user: User;
+}
