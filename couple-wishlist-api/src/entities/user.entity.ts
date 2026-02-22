@@ -10,7 +10,7 @@ import { WishItem } from './wish-item.entity';
 
 @Entity()
 export class User {
-  @PrimaryGeneratedColumn()
+  @PrimaryGeneratedColumn('uuid')
   id: string;
 
   @Column({ unique: true })
@@ -19,7 +19,10 @@ export class User {
   @Column({ select: false })
   password: string;
 
-  @Column({ type: 'uuid', nullable: true })
+  @Column({ unique: true, nullable: true })
+  inviteCode: string;
+
+  @Column({ type: 'varchar', nullable: true })
   partnerId: string | null;
 
   @OneToOne(() => User, { nullable: true })

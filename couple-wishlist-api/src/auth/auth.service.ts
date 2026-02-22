@@ -1,7 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { UsersService } from '../users/users.service';
 import * as bcrypt from 'bcrypt';
+import { CreateUserDto } from '../users/dto/create-user.dto';
 
 @Injectable()
 export class AuthService {
@@ -11,15 +12,27 @@ export class AuthService {
   ) {}
   async login(email: string, pass: string) {
     const user = await this.usersService.findOneByEmailWithPassword(email);
-    if (user && (await bcrypt.compare(pass, user.password))) {
-      const payload = {
-        sub: user.id,
-        email: user.email,
-        partnerId: user.partnerId,
-      };
-      return {
-        accessToken: this.jwtService.sign(payload),
-      };
+
+    // Якщо юзера нема або пароль не підійшов — кидаємо помилку
+    if (!user || !(await bcrypt.compare(pass, user.password))) {
+      throw new UnauthorizedException('Invalid email or password');
     }
+
+    const payload = {
+      sub: user.id,
+      email: user.email,
+      partnerId: user.partnerId,
+    };
+
+    return {
+      accessToken: this.jwtService.sign(payload),
+    };
+  }
+  async register(dto: CreateUserDto) {
+    const hashedPassword = await bcrypt.hash(dto.password, 10);
+    return this.usersService.create({
+      ...dto,
+      password: hashedPassword,
+    });
   }
 }
