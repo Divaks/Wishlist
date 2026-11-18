@@ -85,7 +85,8 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: AI PR Review
-        uses: sshnaidm/gemini-code-review-action@main
+        uses: sshnaidm/gemini-code-review-action@v2
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          gemini-key: ${{ secrets.GEMINI_API_KEY }}
+          model: gemini-2.0-flash
