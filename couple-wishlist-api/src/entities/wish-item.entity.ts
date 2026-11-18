@@ -1,4 +1,10 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  ManyToOne,
+  JoinColumn,
+} from 'typeorm';
 import { User } from './user.entity';
 
 export enum Priority {
@@ -30,6 +36,17 @@ export class WishItem {
   @Column({ default: false })
   isInCart: boolean;
 
+  @Column({ nullable: true })
+  userId: string;
+
   @ManyToOne(() => User, (user) => user.wishlist)
+  @JoinColumn({ name: 'userId' })
   user: User;
+
+  @Column({ nullable: true })
+  reservedById: string | null;
+
+  @ManyToOne(() => User, { nullable: true })
+  @JoinColumn({ name: 'reservedById' })
+  reservedBy: User | null;
 }

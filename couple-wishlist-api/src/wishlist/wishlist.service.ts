@@ -5,11 +5,11 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { User } from '../entities/user.entity';
 import { WishItem } from '../entities/wish-item.entity';
 import { CreateWishlistDto } from './dto/create-wishlist.dto';
 import { UpdateWishlistDto } from './dto/update-wishlist.dto';
 import { UsersService } from '../users/users.service';
+
 @Injectable()
 export class WishlistService {
   constructor(
@@ -18,12 +18,9 @@ export class WishlistService {
     private readonly usersService: UsersService,
   ) {}
   async create(userId: string, dto: CreateWishlistDto) {
-    const user = new User();
-    user.id = userId;
-
     const wish = this.wishRepository.create({
       ...dto,
-      user: user,
+      userId,
     });
 
     return await this.wishRepository.save(wish);
@@ -31,14 +28,14 @@ export class WishlistService {
 
   async findAll(userId: string) {
     return this.wishRepository.find({
-      where: { user: { id: userId } },
+      where: { userId },
       order: { id: 'DESC' },
     });
   }
 
   async remove(userId: string, id: string) {
     const wish = await this.wishRepository.findOne({
-      where: { id, user: { id: userId } },
+      where: { id, userId },
     });
 
     if (!wish) {
@@ -51,7 +48,7 @@ export class WishlistService {
 
   async update(userId: string, id: string, dto: UpdateWishlistDto) {
     const wish = await this.wishRepository.findOne({
-      where: { id, user: { id: userId } },
+      where: { id, userId },
     });
     if (!wish) {
       throw new NotFoundException('Wish item not found');
@@ -69,8 +66,29 @@ export class WishlistService {
       throw new BadRequestException('You have no connected partner');
     }
     return this.wishRepository.find({
-      where: { user: { id: user.partnerId } },
+      where: { userId: user.partnerId },
       order: { id: 'DESC' },
     });
+  }
+
+  async reserveWish(requesterId: string, wishId: string) {
+    const wish = await this.wishRepository.findOne({ where: { id: wishId } });
+    if (!wish) throw new NotFoundException('Wish item not found');
+    if (wish.userId === requesterId) {
+      throw new BadRequestException('You cannot reserve your own wish');
+    }
+    wish.reservedById = requesterId;
+    return this.wishRepository.save(wish);
+  }
+
+  /** Cancel a reservation. */
+  async unreserveWish(requesterId: string, wishId: string) {
+    const wish = await this.wishRepository.findOne({ where: { id: wishId } });
+    if (!wish) throw new NotFoundException('Wish item not found');
+    if (wish.reservedById !== requesterId) {
+      throw new BadRequestException('You have not reserved this wish');
+    }
+    wish.reservedById = null;
+    return this.wishRepository.save(wish);
   }
 }

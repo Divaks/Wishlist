@@ -7,6 +7,7 @@ import {
   OneToMany,
 } from 'typeorm';
 import { WishItem } from './wish-item.entity';
+import { GroupMember } from './group-member.entity';
 
 @Entity()
 export class User {
@@ -18,6 +19,9 @@ export class User {
 
   @Column({ select: false })
   password: string;
+
+  @Column({ nullable: true })
+  name: string;
 
   @Column({ unique: true, nullable: true })
   inviteCode: string;
@@ -31,4 +35,7 @@ export class User {
 
   @OneToMany(() => WishItem, (item) => item.user)
   wishlist: WishItem[];
+
+  @OneToMany(() => GroupMember, (member) => member.user)
+  groupMemberships: GroupMember[];
 }

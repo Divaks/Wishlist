@@ -7,6 +7,8 @@ import {
   Body,
   Param,
   UseGuards,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import { WishlistService } from './wishlist.service';
 import { UpdateWishlistDto } from './dto/update-wishlist.dto';
@@ -42,5 +44,19 @@ export class WishlistController {
   @Get('partner')
   getPartnerWishlist(@GetUser('userId') userId: string) {
     return this.wishlistService.findPartnerWishlist(userId);
+  }
+
+  @Post(':id/reserve')
+  reserveWish(@GetUser('userId') userId: string, @Param('id') wishId: string) {
+    return this.wishlistService.reserveWish(userId, wishId);
+  }
+
+  @Delete(':id/reserve')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  unreserveWish(
+    @GetUser('userId') userId: string,
+    @Param('id') wishId: string,
+  ) {
+    return this.wishlistService.unreserveWish(userId, wishId);
   }
 }

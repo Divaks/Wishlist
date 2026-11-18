@@ -1,0 +1,82 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+# Cancel redundant in-progress runs when pushing new commits to a PR
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ── Job 1: Lint + Test ──────────────────────────────────────────────────────
+  lint-and-test:
+    runs-on: ubuntu-latest # Always use ubuntu (1x minute cost vs 10x for macOS)
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm' # Speeds up runs and saves free minutes
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run ESLint
+        # NOTE: CI uses --max-warnings 0 without --fix so lint errors fail the
+        # build instead of being silently auto-corrected.
+        run: npm run lint -- --max-warnings 0
+
+      - name: Run Tests
+        run: npm test -- --coverage
+
+  # ── Job 2: Reviewdog inline PR annotations (Option A) ──────────────────────
+  reviewdog-eslint:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: ESLint Reviewer
+        uses: reviewdog/action-eslint@v1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          reporter: github-pr-review # Leaves review comments on PR lines
+          eslint_flags: '.'
+
+  # ── Job 3: Gemini AI Code Review (Option B) ────────────────────────────────
+  ai-review:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: AI PR Review
+        uses: sshnaidm/gemini-code-review-action@main
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
