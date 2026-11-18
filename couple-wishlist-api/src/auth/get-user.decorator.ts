@@ -13,6 +13,6 @@ export const GetUser = createParamDecorator(
     const request = ctx.switchToHttp().getRequest<RequestWithUser>();
     const user = request.user;
 
-    return data ? (user as Record<string, any>)?.[data] : user;
+    return data ? (user as Record<string, unknown>)?.[data] : user;
   },
 );
