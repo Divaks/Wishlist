@@ -1,14 +1,14 @@
 import { Module } from '@nestjs/common';
-import { User } from './entities/user.entity';
-import { WishItem } from './entities/wish-item.entity';
-import { Group } from './entities/group.entity';
-import { GroupMember } from './entities/group-member.entity';
+import { User } from './models/user.model';
+import { WishItem } from './models/wish-item.model';
+import { Group } from './models/group.model';
+import { GroupMember } from './models/group-member.model';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule } from '@nestjs/config';
-import { UsersModule } from './users/users.module';
-import { AuthModule } from './auth/auth.module';
-import { WishlistModule } from './wishlist/wishlist.module';
-import { GroupsModule } from './groups/groups.module';
+import { UsersModule } from './modules/users.module';
+import { AuthModule } from './modules/auth.module';
+import { WishlistModule } from './modules/wishlist.module';
+import { GroupsModule } from './modules/groups.module';
 
 @Module({
   imports: [
