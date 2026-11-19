@@ -5,13 +5,13 @@ import {
   OneToOne,
   JoinColumn,
   OneToMany,
-} from 'typeorm';
-import { WishItem } from './wish-item.model';
-import { GroupMember } from './group-member.model';
+} from "typeorm";
+import { WishItem } from "./wish-item.model";
+import { GroupMember } from "./group-member.model";
 
 @Entity()
 export class User {
-  @PrimaryGeneratedColumn('uuid')
+  @PrimaryGeneratedColumn("uuid")
   id: string;
 
   @Column({ unique: true })
@@ -23,14 +23,14 @@ export class User {
   @Column({ nullable: true })
   name: string;
 
-  @Column({ unique: true, nullable: true })
+  @Column({ unique: true, nullable: true, select: false })
   inviteCode: string;
 
-  @Column({ type: 'varchar', nullable: true })
+  @Column({ type: "uuid", nullable: true })
   partnerId: string | null;
 
   @OneToOne(() => User, { nullable: true })
-  @JoinColumn({ name: 'partnerid' })
+  @JoinColumn({ name: "partnerId" })
   partner: User | null;
 
   @OneToMany(() => WishItem, (item) => item.user)

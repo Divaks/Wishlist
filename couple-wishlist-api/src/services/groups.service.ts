@@ -3,15 +3,15 @@ import {
   NotFoundException,
   ForbiddenException,
   ConflictException,
-} from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Group } from '../models/group.model';
-import { GroupMember, GroupRole } from '../models/group-member.model';
-import { User } from '../models/user.model';
-import { WishItem } from '../models/wish-item.model';
-import { CreateGroupDto } from '../dto/groups/create-group.dto';
-import { UpdateGroupDto } from '../dto/groups/update-group.dto';
+} from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { Group } from "../models/group.model";
+import { GroupMember, GroupRole } from "../models/group-member.model";
+import { User } from "../models/user.model";
+import { WishItem } from "../models/wish-item.model";
+import { CreateGroupDto } from "../dto/groups/create-group.dto";
+import { UpdateGroupDto } from "../dto/groups/update-group.dto";
 
 @Injectable()
 export class GroupsService {
@@ -45,14 +45,14 @@ export class GroupsService {
 
   async findMyGroups(userId: string): Promise<Group[]> {
     return this.groupRepository
-      .createQueryBuilder('group')
-      .innerJoin('group.members', 'member', 'member.userId = :userId', {
+      .createQueryBuilder("group")
+      .innerJoin("group.members", "member", "member.userId = :userId", {
         userId,
       })
-      .leftJoinAndSelect('group.members', 'allMembers')
-      .leftJoinAndSelect('allMembers.user', 'memberUser')
-      .leftJoinAndSelect('group.createdBy', 'creator')
-      .orderBy('group.createdAt', 'DESC')
+      .leftJoinAndSelect("group.members", "allMembers")
+      .leftJoinAndSelect("allMembers.user", "memberUser")
+      .leftJoinAndSelect("group.createdBy", "creator")
+      .orderBy("group.createdAt", "DESC")
       .getMany();
   }
 
@@ -61,10 +61,10 @@ export class GroupsService {
 
     const group = await this.groupRepository.findOne({
       where: { id: groupId },
-      relations: ['members', 'members.user', 'createdBy'],
+      relations: ["members", "members.user", "createdBy"],
     });
 
-    if (!group) throw new NotFoundException('Group not found');
+    if (!group) throw new NotFoundException("Group not found");
     return group;
   }
 
@@ -96,7 +96,7 @@ export class GroupsService {
     const existing = await this.memberRepository.findOne({
       where: { groupId, userId: target.id },
     });
-    if (existing) throw new ConflictException('User is already in this group');
+    if (existing) throw new ConflictException("User is already in this group");
 
     const member = this.memberRepository.create({
       groupId,
@@ -115,25 +115,25 @@ export class GroupsService {
       where: { groupId, userId: requesterId },
     });
     if (!requesterMembership)
-      throw new ForbiddenException('You are not a member of this group');
+      throw new ForbiddenException("You are not a member of this group");
 
     const isOwner = requesterMembership.role === GroupRole.OWNER;
     const isSelf = requesterId === targetUserId;
 
     if (!isOwner && !isSelf) {
-      throw new ForbiddenException('Only the owner can remove other members');
+      throw new ForbiddenException("Only the owner can remove other members");
     }
 
     if (isOwner && isSelf) {
       throw new ForbiddenException(
-        'The owner cannot leave the group. Delete the group instead.',
+        "The owner cannot leave the group. Delete the group instead.",
       );
     }
 
     const target = await this.memberRepository.findOne({
       where: { groupId, userId: targetUserId },
     });
-    if (!target) throw new NotFoundException('Member not found in this group');
+    if (!target) throw new NotFoundException("Member not found in this group");
 
     await this.memberRepository.delete(target.id);
   }
@@ -143,23 +143,23 @@ export class GroupsService {
 
     const members = await this.memberRepository.find({
       where: { groupId },
-      select: ['userId'],
+      select: ["userId"],
     });
     const memberIds = members.map((m) => m.userId);
 
     if (memberIds.length === 0) return [];
 
     return this.wishRepository
-      .createQueryBuilder('wish')
-      .leftJoinAndSelect('wish.user', 'user')
+      .createQueryBuilder("wish")
+      .leftJoinAndSelect("wish.user", "user")
       .leftJoinAndSelect(
-        'wish.reservedBy',
-        'reservedBy',
-        'reservedBy.id != :userId',
+        "wish.reservedBy",
+        "reservedBy",
+        "reservedBy.id != :userId",
         { userId },
       )
-      .where('wish.userId IN (:...memberIds)', { memberIds })
-      .orderBy('wish.id', 'DESC')
+      .where("wish.userId IN (:...memberIds)", { memberIds })
+      .orderBy("wish.id", "DESC")
       .getMany();
   }
 
@@ -168,7 +168,7 @@ export class GroupsService {
       where: { groupId, userId },
     });
     if (!membership)
-      throw new ForbiddenException('You are not a member of this group');
+      throw new ForbiddenException("You are not a member of this group");
   }
 
   private async assertOwner(userId: string, groupId: string): Promise<void> {
@@ -177,7 +177,7 @@ export class GroupsService {
     });
     if (!membership || membership.role !== GroupRole.OWNER)
       throw new ForbiddenException(
-        'Only the group owner can perform this action',
+        "Only the group owner can perform this action",
       );
   }
 }

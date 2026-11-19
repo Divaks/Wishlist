@@ -1,12 +1,13 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
-} from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { User } from '../models/user.model';
-import { CreateUserDto } from '../dto/users/create-user.dto';
+} from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { QueryFailedError, Repository } from "typeorm";
+import { User } from "../models/user.model";
+import { CreateUserDto } from "../dto/users/create-user.dto";
 
 @Injectable()
 export class UsersService {
@@ -18,12 +19,22 @@ export class UsersService {
     return this.usersRepository.find();
   }
   async create(createUserDto: CreateUserDto): Promise<User> {
-    const { email, password } = createUserDto;
+    const { email, password, name } = createUserDto;
     const newUser = this.usersRepository.create({
       email,
-      password: password,
+      password,
+      name,
     });
-    return this.usersRepository.save(newUser);
+    try {
+      return await this.usersRepository.save(newUser);
+    } catch (err) {
+      const code = (err as { driverError?: { code?: string } }).driverError
+        ?.code;
+      if (err instanceof QueryFailedError && code === "23505") {
+        throw new ConflictException("Email is already registered");
+      }
+      throw err;
+    }
   }
 
   async findOne(id: string) {
@@ -35,7 +46,7 @@ export class UsersService {
   async findOneByEmailWithPassword(email: string): Promise<User | null> {
     return this.usersRepository.findOne({
       where: { email },
-      select: ['id', 'email', 'password', 'partnerId'],
+      select: ["id", "email", "password", "partnerId"],
     });
   }
 
@@ -51,10 +62,10 @@ export class UsersService {
     });
 
     if (!partner) {
-      throw new NotFoundException('Invalid code');
+      throw new NotFoundException("Invalid code");
     }
     if (partner.id === userId) {
-      throw new BadRequestException('Can not invite yourself');
+      throw new BadRequestException("Can not invite yourself");
     }
     await this.usersRepository.update(userId, { partnerId: partner.id });
     await this.usersRepository.update(partner.id, { partnerId: userId });

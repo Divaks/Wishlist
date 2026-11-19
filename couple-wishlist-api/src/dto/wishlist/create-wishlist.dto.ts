@@ -4,7 +4,7 @@ import {
   IsOptional,
   IsNumber,
   IsUrl,
-} from 'class-validator';
+} from "class-validator";
 
 export class CreateWishlistDto {
   @IsString()
@@ -18,5 +18,5 @@ export class CreateWishlistDto {
   price?: number;
   @IsUrl()
   @IsOptional()
-  url?: string;
+  link?: string;
 }

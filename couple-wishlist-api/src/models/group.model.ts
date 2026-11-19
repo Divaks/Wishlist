@@ -6,13 +6,13 @@ import {
   OneToMany,
   JoinColumn,
   CreateDateColumn,
-} from 'typeorm';
-import { User } from './user.model';
-import { GroupMember } from './group-member.model';
+} from "typeorm";
+import { User } from "./user.model";
+import { GroupMember } from "./group-member.model";
 
 @Entity()
 export class Group {
-  @PrimaryGeneratedColumn('uuid')
+  @PrimaryGeneratedColumn("uuid")
   id: string;
 
   @Column()
@@ -25,7 +25,7 @@ export class Group {
   createdById: string;
 
   @ManyToOne(() => User)
-  @JoinColumn({ name: 'createdById' })
+  @JoinColumn({ name: "createdById" })
   createdBy: User;
 
   @OneToMany(() => GroupMember, (member) => member.group, { cascade: true })

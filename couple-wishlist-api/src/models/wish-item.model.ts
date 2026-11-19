@@ -4,13 +4,13 @@ import {
   Column,
   ManyToOne,
   JoinColumn,
-} from 'typeorm';
-import { User } from './user.model';
+} from "typeorm";
+import { User } from "./user.model";
 
 export enum Priority {
-  LOW = 'low',
-  MEDIUM = 'medium',
-  HIGH = 'high',
+  LOW = "low",
+  MEDIUM = "medium",
+  HIGH = "high",
 }
 
 @Entity()
@@ -24,13 +24,13 @@ export class WishItem {
   @Column({ nullable: true })
   description: string;
 
-  @Column('decimal', { precision: 10, scale: 2, default: 0 })
+  @Column("decimal", { precision: 10, scale: 2, default: 0 })
   price: number;
 
   @Column({ nullable: true })
   link: string;
 
-  @Column({ type: 'enum', enum: Priority, default: Priority.MEDIUM })
+  @Column({ type: "enum", enum: Priority, default: Priority.MEDIUM })
   priority: Priority;
 
   @Column({ default: false })
@@ -40,13 +40,13 @@ export class WishItem {
   userId: string;
 
   @ManyToOne(() => User, (user) => user.wishlist)
-  @JoinColumn({ name: 'userId' })
+  @JoinColumn({ name: "userId" })
   user: User;
 
   @Column({ nullable: true })
   reservedById: string | null;
 
   @ManyToOne(() => User, { nullable: true })
-  @JoinColumn({ name: 'reservedById' })
+  @JoinColumn({ name: "reservedById" })
   reservedBy: User | null;
 }

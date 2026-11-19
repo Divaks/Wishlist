@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsNumber, IsUrl } from 'class-validator';
+import { IsString, IsOptional, IsNumber, IsUrl } from "class-validator";
 
 export class UpdateWishlistDto {
   @IsString()
@@ -12,5 +12,5 @@ export class UpdateWishlistDto {
   price?: number;
   @IsUrl()
   @IsOptional()
-  url?: string;
+  link?: string;
 }

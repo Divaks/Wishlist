@@ -2,13 +2,13 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
-} from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { WishItem } from '../models/wish-item.model';
-import { CreateWishlistDto } from '../dto/wishlist/create-wishlist.dto';
-import { UpdateWishlistDto } from '../dto/wishlist/update-wishlist.dto';
-import { UsersService } from './users.service';
+} from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { WishItem } from "../models/wish-item.model";
+import { CreateWishlistDto } from "../dto/wishlist/create-wishlist.dto";
+import { UpdateWishlistDto } from "../dto/wishlist/update-wishlist.dto";
+import { UsersService } from "./users.service";
 
 @Injectable()
 export class WishlistService {
@@ -29,7 +29,7 @@ export class WishlistService {
   async findAll(userId: string) {
     return this.wishRepository.find({
       where: { userId },
-      order: { id: 'DESC' },
+      order: { id: "DESC" },
     });
   }
 
@@ -40,7 +40,7 @@ export class WishlistService {
 
     if (!wish) {
       throw new NotFoundException(
-        'Wish item not found or you stay away from it',
+        "Wish item not found or you stay away from it",
       );
     }
     return await this.wishRepository.remove(wish);
@@ -51,7 +51,7 @@ export class WishlistService {
       where: { id, userId },
     });
     if (!wish) {
-      throw new NotFoundException('Wish item not found');
+      throw new NotFoundException("Wish item not found");
     }
     Object.assign(wish, dto);
     return await this.wishRepository.save(wish);
@@ -60,22 +60,22 @@ export class WishlistService {
   async findPartnerWishlist(userId: string) {
     const user = await this.usersService.findOne(userId);
     if (!user) {
-      throw new NotFoundException('User not found');
+      throw new NotFoundException("User not found");
     }
     if (!user.partnerId) {
-      throw new BadRequestException('You have no connected partner');
+      throw new BadRequestException("You have no connected partner");
     }
     return this.wishRepository.find({
       where: { userId: user.partnerId },
-      order: { id: 'DESC' },
+      order: { id: "DESC" },
     });
   }
 
   async reserveWish(requesterId: string, wishId: string) {
     const wish = await this.wishRepository.findOne({ where: { id: wishId } });
-    if (!wish) throw new NotFoundException('Wish item not found');
+    if (!wish) throw new NotFoundException("Wish item not found");
     if (wish.userId === requesterId) {
-      throw new BadRequestException('You cannot reserve your own wish');
+      throw new BadRequestException("You cannot reserve your own wish");
     }
     wish.reservedById = requesterId;
     return this.wishRepository.save(wish);
@@ -84,9 +84,9 @@ export class WishlistService {
   /** Cancel a reservation. */
   async unreserveWish(requesterId: string, wishId: string) {
     const wish = await this.wishRepository.findOne({ where: { id: wishId } });
-    if (!wish) throw new NotFoundException('Wish item not found');
+    if (!wish) throw new NotFoundException("Wish item not found");
     if (wish.reservedById !== requesterId) {
-      throw new BadRequestException('You have not reserved this wish');
+      throw new BadRequestException("You have not reserved this wish");
     }
     wish.reservedById = null;
     return this.wishRepository.save(wish);
