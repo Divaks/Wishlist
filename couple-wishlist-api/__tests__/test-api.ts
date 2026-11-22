@@ -90,7 +90,6 @@ async function runE2ETests() {
   assert(
     (loginA.status === 200 || loginA.status === 201) && Boolean(tokenA),
     "Логін Користувача А та отримання JWT",
-    loginA,
   );
 
   const loginB = await request("POST", "/auth/login", undefined, {
@@ -101,7 +100,6 @@ async function runE2ETests() {
   assert(
     (loginB.status === 200 || loginB.status === 201) && Boolean(tokenB),
     "Логін Користувача Б та отримання JWT",
-    loginB,
   );
 
   // Перевірка 401 при невірному паролі
@@ -116,7 +114,7 @@ async function runE2ETests() {
   );
 
   // --- 2. ПРОФІЛЬ ТА ЗВ'ЯЗОК ПАРТНЕРІВ ---
-  console.log(`\n${CYAN}[2] Тестування Users & Partner Connection${RESET}`);
+  console.log(`\n${CYAN}[2] Тестування профілю${RESET}`);
 
   const profileA = await request("GET", "/users/profile", tokenA);
   assert(
@@ -125,33 +123,50 @@ async function runE2ETests() {
     profileA,
   );
 
-  const genCode = await request("POST", "/users/generate-code", tokenA);
-  const inviteCode = genCode.data?.inviteCode;
-  assert(
-    (genCode.status === 201 || genCode.status === 200) && Boolean(inviteCode),
-    `Генерація інвайт-коду (${inviteCode})`,
-    genCode,
-  );
+  // --- 4. ГРУПИ (GROUPS) ---
+  console.log(`\n${CYAN}[3] Тестування Groups${RESET}`);
 
-  const connectRes = await request("POST", "/users/connect", tokenB, {
-    code: inviteCode,
+  const createGroup = await request("POST", "/groups", tokenA, {
+    name: "Новий Рік 2027",
+    description: "Спільні бажання друзів",
   });
+  const groupId = createGroup.data?.id;
   assert(
-    connectRes.status === 201 || connectRes.status === 200,
-    "Підключення Користувача Б до Користувача А за кодом",
-    connectRes,
+    createGroup.status === 201 && Boolean(groupId),
+    `Створення групи Користувачем А (ID: ${groupId})`,
+    createGroup,
   );
 
+  const inviteMember = await request(
+    "POST",
+    `/groups/${groupId}/members`,
+    tokenA,
+    {
+      email: userB.email,
+    },
+  );
+  assert(
+    inviteMember.status === 201 || inviteMember.status === 200,
+    "Додавання Користувача Б у групу",
+    inviteMember,
+  );
+
+  const acceptance = await request(
+    "POST",
+    `/groups/${groupId}/invitations/accept`,
+    tokenB,
+  );
+  assert(acceptance.status === 204, "Прийняття запрошення");
   // --- 3. WISHLIST CRUD + БРОНЮВАННЯ ---
   console.log(
-    `\n${CYAN}[3] Тестування Wishlist (CRUD + Partner View + Reserve)${RESET}`,
+    `\n${CYAN}[4] Тестування Wishlist (CRUD + Partner View + Reserve)${RESET}`,
   );
 
   const createWish = await request("POST", "/wishlist", tokenA, {
     title: "Навушники Sony WH-1000XM5",
     description: "Чорні",
     price: 12500,
-    url: "https://example.com/sony",
+    link: "https://example.com/sony",
   });
   const wishId = createWish.data?.id;
   assert(
@@ -160,21 +175,25 @@ async function runE2ETests() {
     createWish,
   );
 
-  const myWishes = await request("GET", "/wishlist", tokenA);
+  const myWishes = await request("GET", "/wishlist/paged", tokenA);
   assert(
     myWishes.status === 200 &&
-      Array.isArray(myWishes.data) &&
-      myWishes.data.some((w: any) => w.id === wishId),
+      Array.isArray(myWishes.data.data) &&
+      myWishes.data.data.some((w: any) => w.id === wishId),
     "Перегляд власного списку бажань Користувачем А",
     myWishes,
   );
 
   // Користувач Б дивиться вішліст партнера А
-  const partnerWishes = await request("GET", "/wishlist/partner", tokenB);
+  const partnerWishes = await request(
+    "GET",
+    `/groups/${groupId}/wishes/paged`,
+    tokenB,
+  );
   assert(
     partnerWishes.status === 200 &&
-      Array.isArray(partnerWishes.data) &&
-      partnerWishes.data.some((w: any) => w.id === wishId),
+      Array.isArray(partnerWishes.data.data) &&
+      partnerWishes.data.data.some((w: any) => w.id === wishId),
     "Перегляд вішліста партнера Користувачем Б",
     partnerWishes,
   );
@@ -223,37 +242,13 @@ async function runE2ETests() {
     unreserveWish,
   );
 
-  // --- 4. ГРУПИ (GROUPS) ---
-  console.log(`\n${CYAN}[4] Тестування Groups${RESET}`);
-
-  const createGroup = await request("POST", "/groups", tokenA, {
-    name: "Новий Рік 2027",
-    description: "Спільні бажання друзів",
-  });
-  const groupId = createGroup.data?.id;
-  assert(
-    createGroup.status === 201 && Boolean(groupId),
-    `Створення групи Користувачем А (ID: ${groupId})`,
-    createGroup,
-  );
-
-  const inviteMember = await request(
-    "POST",
-    `/groups/${groupId}/members`,
-    tokenA,
-    {
-      email: userB.email,
-    },
+  const groupWishes = await request(
+    "GET",
+    `/groups/${groupId}/wishes/paged`,
+    tokenB,
   );
   assert(
-    inviteMember.status === 201 || inviteMember.status === 200,
-    "Додавання Користувача Б у групу",
-    inviteMember,
-  );
-
-  const groupWishes = await request("GET", `/groups/${groupId}/wishes`, tokenB);
-  assert(
-    groupWishes.status === 200 && Array.isArray(groupWishes.data),
+    groupWishes.status === 200 && Array.isArray(groupWishes.data.data),
     "Перегляд бажань учасників групи Користувачем Б",
     groupWishes,
   );
@@ -275,6 +270,10 @@ async function runE2ETests() {
     deleteGroup,
   );
 
+  for (const token of [tokenA, tokenB]) {
+    const deleted = await request("DELETE", "/users/account", token);
+    assert(deleted.status === 204, "Видалення тестового облікового запису");
+  }
   console.log(
     `\n${GREEN}УСІ ТЕСТИ ПРОЙДЕНО УСПІШНО! Бекенд повністю працездатний.${RESET}`,
   );

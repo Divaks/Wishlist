@@ -40,6 +40,9 @@ describe("GroupsService", () => {
     members = createMockRepository();
     users = createMockRepository();
     wishes = createMockRepository();
+    groups.transactionManager.getRepository.mockImplementation(
+      (entity: unknown) => (entity === Group ? groups : members),
+    );
     const module = await Test.createTestingModule({
       providers: [
         GroupsService,
@@ -131,8 +134,10 @@ describe("GroupsService", () => {
       asOwner();
       groups.findOne.mockResolvedValue({ id: "g1", name: "New" });
       const result = await service.update("u1", "g1", { name: "New" });
-      expect(groups.findOne).toHaveBeenCalledWith({ where: { id: "g1" } });
-      expect(groups.save).toHaveBeenCalled();
+      expect(groups.update).toHaveBeenCalledWith(
+        { id: "g1", createdById: "u1" },
+        { name: "New" },
+      );
       expect(result).toEqual({ id: "g1", name: "New" });
     });
 
@@ -167,8 +172,9 @@ describe("GroupsService", () => {
 
       await service.update("u1", "g1", { name: "New" });
 
-      expect(groups.save).toHaveBeenCalledWith(
-        expect.objectContaining({ name: "New", description: "desc" }),
+      expect(groups.update).toHaveBeenCalledWith(
+        { id: "g1", createdById: "u1" },
+        { name: "New" },
       );
     });
 
@@ -183,8 +189,9 @@ describe("GroupsService", () => {
 
       await service.update("u1", "g1", { description: "New desc" });
 
-      expect(groups.save).toHaveBeenCalledWith(
-        expect.objectContaining({ name: "Old", description: "New desc" }),
+      expect(groups.update).toHaveBeenCalledWith(
+        { id: "g1", createdById: "u1" },
+        { description: "New desc" },
       );
     });
 
@@ -205,7 +212,10 @@ describe("GroupsService", () => {
     it("lets the owner delete the group", async () => {
       asOwner();
       await service.remove("u1", "g1");
-      expect(groups.delete).toHaveBeenCalledWith("g1");
+      expect(groups.delete).toHaveBeenCalledWith({
+        id: "g1",
+        createdById: "u1",
+      });
     });
 
     it("forbids a regular member", async () => {
@@ -218,7 +228,8 @@ describe("GroupsService", () => {
   });
 
   describe("inviteMember", () => {
-    it("adds an existing user as MEMBER", async () => {
+    it("creates a pending invitation for an existing user", async () => {
+      groups.query.mockResolvedValue([{ groupId: "g1" }]);
       members.findOne
         .mockResolvedValueOnce({ role: GroupRole.OWNER }) // requester check
         .mockResolvedValueOnce(null); // not yet in group
@@ -229,12 +240,11 @@ describe("GroupsService", () => {
       expect(users.findOne).toHaveBeenCalledWith({
         where: { email: "b@c.com" },
       });
-      expect(members.create).toHaveBeenCalledWith({
-        groupId: "g1",
-        userId: "u2",
-        role: GroupRole.MEMBER,
-      });
-      expect(members.save).toHaveBeenCalled();
+      expect(groups.query).toHaveBeenCalledWith(
+        expect.stringContaining("group_invitation"),
+        ["g1", "u2", "u1"],
+      );
+      expect(members.save).not.toHaveBeenCalled();
     });
 
     it("forbids non-members from inviting", async () => {
@@ -264,97 +274,73 @@ describe("GroupsService", () => {
     });
   });
 
-  describe("removeMember", () => {
-    it("lets the owner remove another member", async () => {
-      members.findOne
-        .mockResolvedValueOnce({ role: GroupRole.OWNER })
-        .mockResolvedValueOnce({ id: "m2" });
-      await service.removeMember("owner", "g1", "u2");
-      expect(members.delete).toHaveBeenCalledWith("m2");
-    });
-
-    it("lets a member leave on their own", async () => {
-      members.findOne
-        .mockResolvedValueOnce({ role: GroupRole.MEMBER })
-        .mockResolvedValueOnce({ id: "m2" });
-      await service.removeMember("u2", "g1", "u2");
-      expect(members.delete).toHaveBeenCalledWith("m2");
-    });
-
-    it("forbids a requester who is not in the group", async () => {
-      asOutsider();
-      await expect(service.removeMember("u9", "g1", "u2")).rejects.toThrow(
-        "You are not a member of this group",
+  describe("group administration", () => {
+    beforeEach(() =>
+      groups.transactionManager.findOne.mockResolvedValue({
+        createdById: "owner",
+      }),
+    );
+    it("allows members to leave", async () => {
+      await service.removeMember("me", "g1", "me");
+      expect(groups.transactionManager.delete).toHaveBeenCalledWith(
+        GroupMember,
+        { groupId: "g1", userId: "me" },
       );
     });
-
-    it("forbids a regular member from removing someone else", async () => {
-      asMember();
-      await expect(service.removeMember("u1", "g1", "u2")).rejects.toThrow(
-        "Only the owner can remove other members",
-      );
-      expect(members.delete).not.toHaveBeenCalled();
-    });
-
-    it("forbids the owner from leaving their own group", async () => {
-      asOwner();
-      await expect(
-        service.removeMember("owner", "g1", "owner"),
-      ).rejects.toThrow("The owner cannot leave the group");
-      expect(members.delete).not.toHaveBeenCalled();
-    });
-
-    it("throws NotFound when the target is not a member", async () => {
-      members.findOne
-        .mockResolvedValueOnce({ role: GroupRole.OWNER })
-        .mockResolvedValueOnce(null);
-      await expect(service.removeMember("owner", "g1", "u2")).rejects.toThrow(
-        NotFoundException,
-      );
-    });
-  });
-
-  describe("transferOwnership", () => {
-    it("lets the owner transfer ownership to another member", async () => {
-      asOwner();
-      // Use separate objects to avoid reference issues
-      const requesterMember = { role: GroupRole.OWNER, userId: "owner" };
-      const targetMember = { role: GroupRole.MEMBER, userId: "u2" };
-
-      members.findOne
-        .mockResolvedValueOnce({ ...requesterMember }) // requester
-        .mockResolvedValueOnce({ ...targetMember }); // target
-
-      await service.transferOwnership("owner", "g1", "u2");
-
-      expect(members.save).toHaveBeenCalledTimes(2);
-      expect(groups.update).toHaveBeenCalledWith("g1", { createdById: "u2" });
-    });
-
-    it("forbids non-owners", async () => {
-      asMember();
-      await expect(service.transferOwnership("u1", "g1", "u2")).rejects.toThrow(
+    it("protects the owner and other members", async () => {
+      await expect(service.removeMember("me", "g1", "other")).rejects.toThrow(
         ForbiddenException,
       );
-    });
-
-    it("throws BadRequest when transferring to self", async () => {
-      asOwner();
+      await expect(
+        service.removeMember("owner", "g1", "owner"),
+      ).rejects.toThrow(ForbiddenException);
+      await expect(
+        service.transferOwnership("me", "g1", "other"),
+      ).rejects.toThrow(ForbiddenException);
       await expect(
         service.transferOwnership("owner", "g1", "owner"),
-      ).rejects.toThrow("You are already the owner");
+      ).rejects.toThrow(BadRequestException);
     });
-
-    it("throws NotFound when target is not a member", async () => {
-      asOwner();
-      members.findOne.mockResolvedValueOnce({ role: GroupRole.OWNER });
-      members.findOne.mockResolvedValueOnce(null);
+    it("fails if group or target disappears", async () => {
+      groups.transactionManager.findOne.mockResolvedValueOnce(null);
+      await expect(service.removeMember("me", "g1", "me")).rejects.toThrow(
+        NotFoundException,
+      );
+      groups.transactionManager.delete.mockResolvedValueOnce({ affected: 0 });
       await expect(
-        service.transferOwnership("owner", "g1", "u2"),
+        service.removeMember("owner", "g1", "other"),
+      ).rejects.toThrow(NotFoundException);
+      groups.transactionManager.update
+        .mockResolvedValueOnce({ affected: 1 })
+        .mockResolvedValueOnce({ affected: 0 });
+      await expect(
+        service.transferOwnership("owner", "g1", "other"),
       ).rejects.toThrow(NotFoundException);
     });
+    it("transfers ownership inside the transaction", async () => {
+      await service.transferOwnership("owner", "g1", "other");
+      expect(groups.transactionManager.update).toHaveBeenCalledWith(
+        Group,
+        "g1",
+        { createdById: "other" },
+      );
+    });
+    it("only consumes invitations addressed to the current user", async () => {
+      groups.transactionManager.query
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([{ id: "m" }]);
+      await expect(service.acceptInvitation("other", "g1")).rejects.toThrow(
+        NotFoundException,
+      );
+      await service.acceptInvitation("me", "g1");
+      expect(groups.transactionManager.query).toHaveBeenLastCalledWith(
+        expect.any(String),
+        ["g1", "me"],
+      );
+      groups.query.mockResolvedValue([{ groupId: "g1" }]);
+      expect(await service.invitations("me")).toEqual([{ groupId: "g1" }]);
+    });
   });
-
   describe("getGroupWishes", () => {
     it("returns wishes of all members, hiding other people's reservations", async () => {
       members.findOne.mockResolvedValue({ role: GroupRole.MEMBER });
@@ -437,7 +423,7 @@ describe("GroupsService", () => {
       expect(result.data[0]).toBeInstanceOf(WishResponseDto);
       expect(wishes.findAndCount).toHaveBeenCalledWith({
         where: { userId: "u2" },
-        order: { id: "DESC" },
+        order: { createdAt: "DESC", id: "DESC" },
         relations: ["user", "reservedBy"],
         skip: 0,
         take: 20,

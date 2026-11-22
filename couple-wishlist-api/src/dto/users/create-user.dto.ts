@@ -4,6 +4,7 @@ import {
   IsString,
   MinLength,
   MaxLength,
+  IsByteLength,
 } from "class-validator";
 
 export class CreateUserDto {
@@ -13,7 +14,7 @@ export class CreateUserDto {
 
   @IsString()
   @MinLength(8, { message: "Password must be at least 8 characters" })
-  @MaxLength(72, { message: "Password must be at most 72 characters" })
+  @IsByteLength(0, 72, { message: "Password must be at most 72 UTF-8 bytes" })
   password: string;
 
   @IsString()

@@ -2,10 +2,10 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
-  ForbiddenException,
+  ConflictException,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
+import { IsNull, Repository } from "typeorm";
 import { WishItem, Priority } from "../models/wish-item.model";
 import { GroupMember } from "../models/group-member.model";
 import { CreateWishlistDto } from "../dto/wishlist/create-wishlist.dto";
@@ -18,8 +18,6 @@ export class WishlistService {
   constructor(
     @InjectRepository(WishItem)
     private readonly wishRepository: Repository<WishItem>,
-    @InjectRepository(GroupMember)
-    private readonly memberRepository: Repository<GroupMember>,
   ) {}
 
   async create(userId: string, dto: CreateWishlistDto) {
@@ -28,25 +26,27 @@ export class WishlistService {
       description: dto.description,
       price: dto.price ?? 0,
       link: dto.link,
+      isInCart: dto.isInCart ?? false,
       priority: dto.priority ?? Priority.MEDIUM,
       userId,
     });
 
-    return await this.wishRepository.save(wish);
+    const saved = await this.wishRepository.save(wish);
+    return new WishResponseDto(saved, userId);
   }
 
   async findAll(
     userId: string,
-    pagination: PaginationDto,
+    pagination: PaginationDto | null,
   ): Promise<PaginatedResult<WishResponseDto>> {
-    const page = pagination.page ?? 1;
-    const limit = pagination.limit ?? 20;
+    const page = pagination?.page ?? 1;
+    const limit = pagination?.limit ?? 20;
 
     const [data, total] = await this.wishRepository.findAndCount({
       where: { userId },
-      order: { id: "DESC" },
+      order: { createdAt: "DESC", id: "DESC" },
       skip: (page - 1) * limit,
-      take: limit,
+      take: pagination ? limit : undefined,
       relations: ["user", "reservedBy"],
     });
 
@@ -75,76 +75,67 @@ export class WishlistService {
         "Wish item not found or you stay away from it",
       );
     }
-    return await this.wishRepository.remove(wish);
+    await this.wishRepository.remove(wish);
   }
 
   async update(userId: string, id: string, dto: UpdateWishlistDto) {
-    const wish = await this.wishRepository.findOne({
-      where: { id, userId },
-    });
-    if (!wish) {
-      throw new NotFoundException("Wish item not found");
+    if (Object.keys(dto).length) {
+      const updated = await this.wishRepository.update({ id, userId }, dto);
+      if (!updated.affected) throw new NotFoundException("Wish item not found");
     }
-    if (dto.title !== undefined) wish.title = dto.title;
-    if (dto.description !== undefined) wish.description = dto.description;
-    if (dto.price !== undefined) wish.price = dto.price;
-    if (dto.link !== undefined) wish.link = dto.link;
-    if (dto.priority !== undefined) wish.priority = dto.priority;
-    if (dto.isInCart !== undefined) wish.isInCart = dto.isInCart;
-    const saved = await this.wishRepository.save(wish);
-    return new WishResponseDto(saved, userId);
+    return this.findOne(userId, id);
   }
 
   private async assertSharedGroup(
+    members: Repository<GroupMember>,
     userId1: string,
     userId2: string,
   ): Promise<void> {
-    if (userId1 === userId2) return;
-
-    const sharedGroup = await this.memberRepository
+    const sharedGroup = await members
       .createQueryBuilder("m1")
       .innerJoin("group_member", "m2", "m1.groupId = m2.groupId")
       .where("m1.userId = :userId1", { userId1 })
       .andWhere("m2.userId = :userId2", { userId2 })
+      .setLock("pessimistic_read")
       .getOne();
 
     if (!sharedGroup) {
-      throw new ForbiddenException(
-        "You can only reserve wishes from users in your groups",
-      );
+      throw new NotFoundException("Wish item not found");
     }
   }
 
   async reserveWish(requesterId: string, wishId: string) {
-    const wish = await this.wishRepository.findOne({
-      where: { id: wishId },
-      relations: ["user", "reservedBy"],
+    return this.wishRepository.manager.transaction(async (manager) => {
+      const wishes = manager.getRepository(WishItem);
+      const wish = await wishes.findOne({
+        where: { id: wishId },
+        relations: ["user", "reservedBy"],
+      });
+      if (!wish) throw new NotFoundException("Wish item not found");
+      if (wish.userId === requesterId) {
+        throw new BadRequestException("You cannot reserve your own wish");
+      }
+      await this.assertSharedGroup(
+        manager.getRepository(GroupMember),
+        requesterId,
+        wish.userId,
+      );
+      const result = await wishes.update(
+        { id: wishId, reservedById: IsNull() },
+        { reservedById: requesterId },
+      );
+      if (!result.affected)
+        throw new ConflictException("Wish already reserved");
+      wish.reservedById = requesterId;
+      return new WishResponseDto(wish, requesterId);
     });
-    if (!wish) throw new NotFoundException("Wish item not found");
-    if (wish.userId === requesterId) {
-      throw new BadRequestException("You cannot reserve your own wish");
-    }
-    if (wish.reservedById) {
-      throw new BadRequestException("This wish is already reserved");
-    }
-    await this.assertSharedGroup(requesterId, wish.userId);
-    wish.reservedById = requesterId;
-    const saved = await this.wishRepository.save(wish);
-    return new WishResponseDto(saved, requesterId);
   }
 
-  /** Cancel a reservation. */
   async unreserveWish(requesterId: string, wishId: string) {
-    const wish = await this.wishRepository.findOne({
-      where: { id: wishId },
-      relations: ["user", "reservedBy"],
-    });
-    if (!wish) throw new NotFoundException("Wish item not found");
-    if (wish.reservedById !== requesterId) {
-      throw new BadRequestException("You have not reserved this wish");
-    }
-    wish.reservedById = null;
-    const saved = await this.wishRepository.save(wish);
-    return new WishResponseDto(saved, requesterId);
+    const result = await this.wishRepository.update(
+      { id: wishId, reservedById: requesterId },
+      { reservedById: null },
+    );
+    if (!result.affected) throw new NotFoundException("Reservation not found");
   }
 }

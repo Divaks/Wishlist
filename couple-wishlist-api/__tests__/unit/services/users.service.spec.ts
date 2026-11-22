@@ -123,14 +123,14 @@ describe("UsersService", () => {
       repo.save.mockResolvedValue({
         ...user,
         name: "New",
-        birthday: new Date("1990-01-01"),
+        birthday: "1990-01-01",
       });
 
       const dto: UpdateUserDto = { name: "New", birthday: "1990-01-01" };
       const result = await service.updateProfile("u1", dto);
 
       expect(result.name).toBe("New");
-      expect(result.birthday).toEqual(new Date("1990-01-01"));
+      expect(result.birthday).toEqual("1990-01-01");
       expect(repo.save).toHaveBeenCalled();
     });
 
@@ -142,27 +142,35 @@ describe("UsersService", () => {
     });
 
     it("updates only provided fields", async () => {
-      const user = { id: "u1", name: "Old", birthday: new Date("1990-01-01") };
+      const user = { id: "u1", name: "Old", birthday: "1990-01-01" };
       repo.findOne.mockResolvedValue(user);
       repo.save.mockResolvedValue({ ...user, name: "New" });
 
       const result = await service.updateProfile("u1", { name: "New" });
 
       expect(result.name).toBe("New");
-      expect(result.birthday).toEqual(new Date("1990-01-01"));
+      expect(result.birthday).toEqual("1990-01-01");
     });
   });
 
   describe("deleteAccount", () => {
+    it("requires ownership transfer before deletion", async () => {
+      repo.transactionManager.findOne.mockResolvedValue({ id: "u1" });
+      repo.transactionManager.existsBy.mockResolvedValue(true);
+      await expect(service.deleteAccount("u1")).rejects.toThrow(
+        ConflictException,
+      );
+      expect(repo.transactionManager.remove).not.toHaveBeenCalled();
+    });
     it("removes the user", async () => {
       const user = { id: "u1" };
-      repo.findOne.mockResolvedValue(user);
+      repo.transactionManager.findOne.mockResolvedValue(user);
       await service.deleteAccount("u1");
-      expect(repo.remove).toHaveBeenCalledWith(user);
+      expect(repo.transactionManager.remove).toHaveBeenCalledWith(user);
     });
 
     it("throws NotFound when user does not exist", async () => {
-      repo.findOne.mockResolvedValue(null);
+      repo.transactionManager.findOne.mockResolvedValue(null);
       await expect(service.deleteAccount("u1")).rejects.toThrow(
         NotFoundException,
       );

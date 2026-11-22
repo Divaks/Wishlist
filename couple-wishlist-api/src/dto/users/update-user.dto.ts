@@ -1,4 +1,10 @@
-import { IsOptional, IsString, MaxLength, IsDateString } from "class-validator";
+import {
+  IsOptional,
+  IsString,
+  MaxLength,
+  IsDateString,
+  Matches,
+} from "class-validator";
 
 export class UpdateUserDto {
   @IsString()
@@ -6,7 +12,8 @@ export class UpdateUserDto {
   @MaxLength(100)
   name?: string;
 
-  @IsDateString()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/)
+  @IsDateString({ strict: true })
   @IsOptional()
-  birthday?: string;
+  birthday?: string | null;
 }

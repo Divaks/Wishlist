@@ -1,4 +1,4 @@
-import { Expose, Exclude } from "class-transformer";
+import { Expose } from "class-transformer";
 import { User } from "../../models/user.model";
 
 export class UserResponseDto {
@@ -9,19 +9,7 @@ export class UserResponseDto {
   name: string | null;
 
   @Expose()
-  birthday: Date | null;
-
-  @Exclude()
-  email: string;
-
-  @Exclude()
-  password: string;
-
-  @Exclude()
-  groupMemberships: any;
-
-  @Exclude()
-  wishlist: any;
+  birthday: string | null;
 
   constructor(user: User) {
     this.id = user.id;

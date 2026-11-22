@@ -17,7 +17,7 @@ export class User {
   name: string;
 
   @Column({ type: "date", nullable: true })
-  birthday: Date | null;
+  birthday: string | null;
 
   @OneToMany(() => WishItem, (item) => item.user)
   wishlist: WishItem[];

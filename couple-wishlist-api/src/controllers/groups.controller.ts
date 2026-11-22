@@ -31,11 +31,30 @@ export class GroupsController {
   }
 
   @Get()
+  async findMyGroupsArray(@GetUser("userId") userId: string) {
+    return (await this.groupsService.findMyGroups(userId, null)).data;
+  }
+
+  @Get("paged")
   findMyGroups(
     @GetUser("userId") userId: string,
     @Query() pagination: PaginationDto,
   ) {
     return this.groupsService.findMyGroups(userId, pagination);
+  }
+
+  @Get("invitations")
+  invitations(@GetUser("userId") userId: string) {
+    return this.groupsService.invitations(userId);
+  }
+
+  @Post(":groupId/invitations/accept")
+  @HttpCode(HttpStatus.NO_CONTENT)
+  accept(
+    @GetUser("userId") userId: string,
+    @Param("groupId", ParseUUIDPipe) groupId: string,
+  ) {
+    return this.groupsService.acceptInvitation(userId, groupId);
   }
 
   @Get(":groupId")
@@ -103,6 +122,15 @@ export class GroupsController {
   }
 
   @Get(":groupId/wishes")
+  async getGroupWishesArray(
+    @GetUser("userId") userId: string,
+    @Param("groupId", ParseUUIDPipe) groupId: string,
+  ) {
+    return (await this.groupsService.getGroupWishes(userId, groupId, null))
+      .data;
+  }
+
+  @Get(":groupId/wishes/paged")
   getGroupWishes(
     @GetUser("userId") userId: string,
     @Param("groupId", ParseUUIDPipe) groupId: string,

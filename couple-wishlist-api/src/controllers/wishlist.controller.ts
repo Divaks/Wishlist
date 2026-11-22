@@ -9,9 +9,9 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
-  ParseUUIDPipe,
   Query,
 } from "@nestjs/common";
+import { WishIdPipe } from "../wish-id.pipe";
 import { WishlistService } from "../services/wishlist.service";
 import { UpdateWishlistDto } from "../dto/wishlist/update-wishlist.dto";
 import { CreateWishlistDto } from "../dto/wishlist/create-wishlist.dto";
@@ -30,6 +30,11 @@ export class WishlistController {
   }
 
   @Get()
+  async findAllArray(@GetUser("userId") userId: string) {
+    return (await this.wishlistService.findAll(userId, null)).data;
+  }
+
+  @Get("paged")
   findAll(
     @GetUser("userId") userId: string,
     @Query() pagination: PaginationDto,
@@ -40,15 +45,16 @@ export class WishlistController {
   @Get(":id")
   findOne(
     @GetUser("userId") userId: string,
-    @Param("id", ParseUUIDPipe) wishId: string,
+    @Param("id", WishIdPipe) wishId: string,
   ) {
     return this.wishlistService.findOne(userId, wishId);
   }
 
   @Delete(":id")
+  @HttpCode(HttpStatus.NO_CONTENT)
   remove(
     @GetUser("userId") userId: string,
-    @Param("id", ParseUUIDPipe) wishId: string,
+    @Param("id", WishIdPipe) wishId: string,
   ) {
     return this.wishlistService.remove(userId, wishId);
   }
@@ -56,7 +62,7 @@ export class WishlistController {
   @Patch(":id")
   update(
     @GetUser("userId") userId: string,
-    @Param("id", ParseUUIDPipe) wishId: string,
+    @Param("id", WishIdPipe) wishId: string,
     @Body() dto: UpdateWishlistDto,
   ) {
     return this.wishlistService.update(userId, wishId, dto);
@@ -65,7 +71,7 @@ export class WishlistController {
   @Post(":id/reserve")
   reserveWish(
     @GetUser("userId") userId: string,
-    @Param("id", ParseUUIDPipe) wishId: string,
+    @Param("id", WishIdPipe) wishId: string,
   ) {
     return this.wishlistService.reserveWish(userId, wishId);
   }
@@ -74,7 +80,7 @@ export class WishlistController {
   @HttpCode(HttpStatus.NO_CONTENT)
   unreserveWish(
     @GetUser("userId") userId: string,
-    @Param("id", ParseUUIDPipe) wishId: string,
+    @Param("id", WishIdPipe) wishId: string,
   ) {
     return this.wishlistService.unreserveWish(userId, wishId);
   }

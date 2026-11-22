@@ -1,3 +1,4 @@
+import { WishlistSchema1795300000000 } from "./migrations/1795300000000-wishlist-schema";
 import { Module } from "@nestjs/common";
 import { User } from "./models/user.model";
 import { WishItem } from "./models/wish-item.model";
@@ -17,7 +18,11 @@ import { HealthController } from "./controllers/health.controller";
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: [`.env.${process.env.NODE_ENV ?? "local"}`, ".env"],
+      envFilePath: [
+        `.env.${process.env.NODE_ENV ?? "local"}`,
+        ".env",
+        "../.env",
+      ],
     }),
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
@@ -27,10 +32,12 @@ import { HealthController } from "./controllers/health.controller";
         port: Number(config.get<string>("DB_PORT", "5432")),
         username: config.get<string>("DB_USERNAME", "postgres"),
         password: config.get<string>("DB_PASSWORD"),
-        database: config.get<string>("DB_NAME", "wishlist"),
+        database: config.get<string>("DB_NAME", "wishlist_db"),
         autoLoadEntities: true,
         entities: [User, WishItem, Group, GroupMember],
-        synchronize: config.get<string>("DB_SYNCHRONIZE", "false") === "true",
+        synchronize: false,
+        migrations: [WishlistSchema1795300000000],
+        migrationsRun: true,
       }),
     }),
     ThrottlerModule.forRoot([

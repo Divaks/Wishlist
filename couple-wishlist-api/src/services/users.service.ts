@@ -5,6 +5,9 @@ import {
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { QueryFailedError, Repository } from "typeorm";
+import { Group } from "../models/group.model";
+import { GroupMember } from "../models/group-member.model";
+import { WishItem } from "../models/wish-item.model";
 import { User } from "../models/user.model";
 import { CreateUserDto } from "../dto/users/create-user.dto";
 import { UpdateUserDto } from "../dto/users/update-user.dto";
@@ -54,13 +57,29 @@ export class UsersService {
     const user = await this.usersRepository.findOne({ where: { id: userId } });
     if (!user) throw new NotFoundException("User not found");
     if (dto.name !== undefined) user.name = dto.name;
-    if (dto.birthday !== undefined) user.birthday = new Date(dto.birthday);
+    if (dto.birthday !== undefined) user.birthday = dto.birthday;
     return await this.usersRepository.save(user);
   }
 
   async deleteAccount(userId: string): Promise<void> {
-    const user = await this.usersRepository.findOne({ where: { id: userId } });
-    if (!user) throw new NotFoundException("User not found");
-    await this.usersRepository.remove(user);
+    await this.usersRepository.manager.transaction(async (manager) => {
+      const user = await manager.findOne(User, {
+        where: { id: userId },
+        lock: { mode: "pessimistic_write" },
+      });
+      if (!user) throw new NotFoundException("User not found");
+      if (await manager.existsBy(Group, { createdById: userId }))
+        throw new ConflictException(
+          "Transfer or delete your groups before deleting your account",
+        );
+      await manager.update(
+        WishItem,
+        { reservedById: userId },
+        { reservedById: null },
+      );
+      await manager.delete(WishItem, { userId });
+      await manager.delete(GroupMember, { userId });
+      await manager.remove(user);
+    });
   }
 }

@@ -268,7 +268,8 @@ describe("DTO validation", () => {
       expect(response.title).toBe("Test");
       expect(response.user).toBeDefined();
       expect(response.reservedBy).toBeDefined();
-      expect(response.reservedById).toBe("u2");
+      expect(response.reservedById).toBeNull();
+      expect(response.isReserved).toBe(true);
     });
 
     it("hides reservation from wish owner", () => {
@@ -313,7 +314,8 @@ describe("DTO validation", () => {
 
       const response = new WishResponseDto(wish, "u3");
 
-      expect(response.reservedById).toBe("u2");
+      expect(response.reservedById).toBeNull();
+      expect(response.isReserved).toBe(true);
       expect(response.reservedBy).toBeDefined();
     });
 
@@ -337,7 +339,7 @@ describe("DTO validation", () => {
       const response = new WishResponseDto(wish, "u1");
 
       expect(response.user).toBeDefined();
-      expect(response.user.id).toBe("");
+      expect(response.user).toBeNull();
     });
   });
 });

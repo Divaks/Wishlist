@@ -3,7 +3,7 @@ import { getRepositoryToken } from "@nestjs/typeorm";
 import {
   BadRequestException,
   NotFoundException,
-  ForbiddenException,
+  ConflictException,
 } from "@nestjs/common";
 import { WishlistService } from "../../../src/services/wishlist.service";
 import { WishItem, Priority } from "../../../src/models/wish-item.model";
@@ -27,6 +27,9 @@ describe("WishlistService", () => {
     jest.resetAllMocks();
     repo = createMockRepository();
     members = createMockRepository();
+    repo.transactionManager.getRepository.mockImplementation(
+      (entity: unknown) => (entity === WishItem ? repo : members),
+    );
     const module = await Test.createTestingModule({
       providers: [
         WishlistService,
@@ -51,6 +54,7 @@ describe("WishlistService", () => {
         description: undefined,
         link: undefined,
         priority: "medium",
+        isInCart: false,
         userId: "u1",
       });
       expect(result).toMatchObject({ title: "Camera", userId: "u1" });
@@ -83,7 +87,7 @@ describe("WishlistService", () => {
 
       expect(repo.findAndCount).toHaveBeenCalledWith({
         where: { userId: "u1" },
-        order: { id: "DESC" },
+        order: { createdAt: "DESC", id: "DESC" },
         skip: 0,
         take: 20,
         relations: ["user", "reservedBy"],
@@ -163,49 +167,32 @@ describe("WishlistService", () => {
   });
 
   describe("update", () => {
-    it("merges the dto into the existing wish and saves", async () => {
-      const wish = { id: "1", userId: "u1", title: "Old", price: 5 };
-      repo.findOne.mockResolvedValue(wish);
-      repo.save.mockResolvedValue({ ...wish, title: "New" });
-
-      const result = await service.update("u1", "1", { title: "New" });
-
-      expect(result).toBeInstanceOf(WishResponseDto);
-      expect(result.title).toBe("New");
-      expect(repo.save).toHaveBeenCalled();
-    });
-
-    it("throws NotFound when the wish is not the users", async () => {
-      repo.findOne.mockResolvedValue(null);
-      await expect(service.update("u1", "1", { title: "x" })).rejects.toThrow(
-        NotFoundException,
-      );
-      expect(repo.save).not.toHaveBeenCalled();
-    });
-
-    it("updates only provided fields", async () => {
-      const wish = {
+    it("changes only requested fields on an owned wish", async () => {
+      repo.findOne.mockResolvedValue({
         id: "1",
         userId: "u1",
-        title: "Old",
-        price: 5,
-        description: "desc",
-      };
-      repo.findOne.mockResolvedValue(wish);
-      repo.save.mockResolvedValue({ ...wish, price: 10 });
-
-      await service.update("u1", "1", { title: "Old", price: 10 });
-
-      expect(repo.save).toHaveBeenCalledWith(
-        expect.objectContaining({
-          price: 10,
-          title: "Old",
-          description: "desc",
-        }),
+        title: "New",
+        price: "12.50",
+      });
+      const result = await service.update("u1", "1", { title: "New" });
+      expect(repo.update).toHaveBeenCalledWith(
+        { id: "1", userId: "u1" },
+        { title: "New" },
+      );
+      expect(result.price).toBe(12.5);
+    });
+    it("rejects a missing or inaccessible wish", async () => {
+      repo.update.mockResolvedValue({ affected: 0 });
+      await expect(service.update("u1", "1", { title: "New" })).rejects.toThrow(
+        NotFoundException,
       );
     });
+    it("reads the existing wish for an empty patch", async () => {
+      repo.findOne.mockResolvedValue({ id: "1", userId: "u1" });
+      await service.update("u1", "1", {});
+      expect(repo.update).not.toHaveBeenCalled();
+    });
   });
-
   describe("reserveWish", () => {
     it("reserves a wish from another user in same group", async () => {
       const wish = { id: "1", userId: "partner", reservedById: null };
@@ -213,6 +200,7 @@ describe("WishlistService", () => {
       members.createQueryBuilder.mockReturnValue({
         innerJoin: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
+        setLock: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
         getOne: jest.fn().mockResolvedValue({ id: "gm1" }),
       });
@@ -239,18 +227,20 @@ describe("WishlistService", () => {
       expect(repo.save).not.toHaveBeenCalled();
     });
 
-    it("throws BadRequest when wish already reserved", async () => {
-      repo.findOne.mockResolvedValue({
-        id: "1",
-        userId: "partner",
-        reservedById: "other",
+    it("rejects losing a concurrent reservation", async () => {
+      repo.findOne.mockResolvedValue({ id: "1", userId: "other" });
+      members.createQueryBuilder.mockReturnValue({
+        innerJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        setLock: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockResolvedValue({ id: "shared" }),
       });
+      repo.update.mockResolvedValue({ affected: 0 });
       await expect(service.reserveWish("me", "1")).rejects.toThrow(
-        BadRequestException,
+        ConflictException,
       );
-      expect(repo.save).not.toHaveBeenCalled();
     });
-
     it("throws Forbidden when users share no group", async () => {
       repo.findOne.mockResolvedValue({
         id: "1",
@@ -260,11 +250,12 @@ describe("WishlistService", () => {
       members.createQueryBuilder.mockReturnValue({
         innerJoin: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
+        setLock: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
         getOne: jest.fn().mockResolvedValue(null),
       });
       await expect(service.reserveWish("me", "1")).rejects.toThrow(
-        ForbiddenException,
+        NotFoundException,
       );
     });
 
@@ -280,36 +271,17 @@ describe("WishlistService", () => {
   });
 
   describe("unreserveWish", () => {
-    it("clears the reservation made by the requester", async () => {
-      const wish = { id: "1", reservedById: "me" };
-      repo.findOne.mockResolvedValue(wish);
-      repo.save.mockResolvedValue({ ...wish, reservedById: null });
-
-      const result = await service.unreserveWish("me", "1");
-
-      expect(result).toBeInstanceOf(WishResponseDto);
-      expect(result.reservedById).toBeNull();
+    it("clears only the caller's reservation", async () => {
+      await service.unreserveWish("me", "1");
+      expect(repo.update).toHaveBeenCalledWith(
+        { id: "1", reservedById: "me" },
+        { reservedById: null },
+      );
     });
-
-    it("throws NotFound for an unknown wish", async () => {
-      repo.findOne.mockResolvedValue(null);
+    it("returns not found for a missing or inaccessible reservation", async () => {
+      repo.update.mockResolvedValue({ affected: 0 });
       await expect(service.unreserveWish("me", "1")).rejects.toThrow(
         NotFoundException,
-      );
-    });
-
-    it("rejects cancelling a reservation made by someone else", async () => {
-      repo.findOne.mockResolvedValue({ id: "1", reservedById: "other" });
-      await expect(service.unreserveWish("me", "1")).rejects.toThrow(
-        "You have not reserved this wish",
-      );
-      expect(repo.save).not.toHaveBeenCalled();
-    });
-
-    it("rejects when the wish is not reserved at all", async () => {
-      repo.findOne.mockResolvedValue({ id: "1", reservedById: null });
-      await expect(service.unreserveWish("me", "1")).rejects.toThrow(
-        BadRequestException,
       );
     });
   });

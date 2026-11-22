@@ -1,3 +1,4 @@
+import { WishIdPipe } from "../../../src/wish-id.pipe";
 import { Test } from "@nestjs/testing";
 import { NotFoundException } from "@nestjs/common";
 import { WishlistController } from "../../../src/controllers/wishlist.controller";
@@ -27,6 +28,11 @@ describe("WishlistController", () => {
 
   const pagination: PaginationDto = { page: 1, limit: 20 };
 
+  it("keeps findAll array responses for legacy clients", async () => {
+    service.findAll.mockResolvedValue({ data: [{ id: "first" }] });
+    expect(await controller.findAllArray("u1")).toEqual([{ id: "first" }]);
+    expect(service.findAll).toHaveBeenCalledWith("u1", null);
+  });
   it("create", async () => {
     service.create.mockResolvedValue({ id: "1" });
     await expect(controller.create("u1", { title: "T" })).resolves.toEqual({
@@ -72,5 +78,17 @@ describe("WishlistController", () => {
   it("unreserveWish", async () => {
     await controller.unreserveWish("u1", "w1");
     expect(service.unreserveWish).toHaveBeenCalledWith("u1", "w1");
+  });
+});
+
+describe("wish identifiers", () => {
+  const pipe = new WishIdPipe();
+  it("accepts legacy serials and UUIDs", async () => {
+    const uuid = "00000000-0000-4000-8000-000000000001";
+    for (const id of ["1", uuid])
+      await expect(pipe.transform(id, { type: "param" })).resolves.toBe(uuid);
+  });
+  it.each(["2147483648", "invalid"])("rejects invalid ID %s", async (value) => {
+    await expect(pipe.transform(value, { type: "param" })).rejects.toThrow();
   });
 });
