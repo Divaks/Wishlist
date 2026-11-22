@@ -1,6 +1,7 @@
 import { Test } from "@nestjs/testing";
 import { getRepositoryToken } from "@nestjs/typeorm";
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   NotFoundException,
@@ -10,6 +11,11 @@ import { Group } from "../../../src/models/group.model";
 import { GroupMember, GroupRole } from "../../../src/models/group-member.model";
 import { User } from "../../../src/models/user.model";
 import { WishItem } from "../../../src/models/wish-item.model";
+import {
+  PaginationDto,
+  PaginatedResult,
+} from "../../../src/dto/common/pagination.dto";
+import { WishResponseDto } from "../../../src/dto/wishlist/wish-response.dto";
 import {
   createMockQueryBuilder,
   createMockRepository,
@@ -46,6 +52,8 @@ describe("GroupsService", () => {
     service = module.get(GroupsService);
   });
 
+  const pagination: PaginationDto = { page: 1, limit: 20 };
+
   describe("create", () => {
     it("creates the group and enrols the creator as OWNER", async () => {
       groups.save.mockResolvedValue({ id: "g1", name: "Trip" });
@@ -73,7 +81,9 @@ describe("GroupsService", () => {
       const qb = createMockQueryBuilder([{ id: "g1" }]);
       groups.createQueryBuilder.mockReturnValue(qb);
 
-      await expect(service.findMyGroups("u1")).resolves.toEqual([{ id: "g1" }]);
+      await expect(service.findMyGroups("u1", pagination)).resolves.toEqual(
+        new PaginatedResult([{ id: "g1" }], 1, 1, 20),
+      );
       expect(qb.innerJoin).toHaveBeenCalledWith(
         "group.members",
         "member",
@@ -81,6 +91,8 @@ describe("GroupsService", () => {
         { userId: "u1" },
       );
       expect(qb.orderBy).toHaveBeenCalledWith("group.createdAt", "DESC");
+      expect(qb.skip).toHaveBeenCalledWith(0);
+      expect(qb.take).toHaveBeenCalledWith(20);
     });
   });
 
@@ -119,7 +131,8 @@ describe("GroupsService", () => {
       asOwner();
       groups.findOne.mockResolvedValue({ id: "g1", name: "New" });
       const result = await service.update("u1", "g1", { name: "New" });
-      expect(groups.update).toHaveBeenCalledWith("g1", { name: "New" });
+      expect(groups.findOne).toHaveBeenCalledWith({ where: { id: "g1" } });
+      expect(groups.save).toHaveBeenCalled();
       expect(result).toEqual({ id: "g1", name: "New" });
     });
 
@@ -136,6 +149,55 @@ describe("GroupsService", () => {
       await expect(service.update("u1", "g1", { name: "x" })).rejects.toThrow(
         "Only the group owner can perform this action",
       );
+    });
+
+    it("throws NotFound when group does not exist", async () => {
+      asOwner();
+      groups.findOne.mockResolvedValue(null);
+      await expect(service.update("u1", "g1", { name: "x" })).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it("only updates provided fields (name only)", async () => {
+      asOwner();
+      const existingGroup = { id: "g1", name: "Old", description: "desc" };
+      groups.findOne.mockResolvedValue(existingGroup);
+      groups.save.mockResolvedValue({ ...existingGroup, name: "New" });
+
+      await service.update("u1", "g1", { name: "New" });
+
+      expect(groups.save).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "New", description: "desc" }),
+      );
+    });
+
+    it("only updates provided fields (description only)", async () => {
+      asOwner();
+      const existingGroup = { id: "g1", name: "Old", description: "old desc" };
+      groups.findOne.mockResolvedValue(existingGroup);
+      groups.save.mockResolvedValue({
+        ...existingGroup,
+        description: "New desc",
+      });
+
+      await service.update("u1", "g1", { description: "New desc" });
+
+      expect(groups.save).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "Old", description: "New desc" }),
+      );
+    });
+
+    it("uses default page and limit when not provided", async () => {
+      asOwner();
+      groups.findOne.mockResolvedValue({ id: "g1", name: "Test" });
+      const qb = createMockQueryBuilder([{ id: "g1" }]);
+      groups.createQueryBuilder.mockReturnValue(qb);
+
+      await service.findMyGroups("u1", {});
+
+      expect(qb.skip).toHaveBeenCalledWith(0);
+      expect(qb.take).toHaveBeenCalledWith(20);
     });
   });
 
@@ -158,7 +220,7 @@ describe("GroupsService", () => {
   describe("inviteMember", () => {
     it("adds an existing user as MEMBER", async () => {
       members.findOne
-        .mockResolvedValueOnce({ role: GroupRole.MEMBER }) // requester check
+        .mockResolvedValueOnce({ role: GroupRole.OWNER }) // requester check
         .mockResolvedValueOnce(null); // not yet in group
       users.findOne.mockResolvedValue({ id: "u2" });
 
@@ -183,7 +245,7 @@ describe("GroupsService", () => {
     });
 
     it("throws NotFound when the email is not registered", async () => {
-      asMember();
+      asOwner();
       users.findOne.mockResolvedValue(null);
       await expect(
         service.inviteMember("u1", "g1", "ghost@c.com"),
@@ -252,6 +314,47 @@ describe("GroupsService", () => {
     });
   });
 
+  describe("transferOwnership", () => {
+    it("lets the owner transfer ownership to another member", async () => {
+      asOwner();
+      // Use separate objects to avoid reference issues
+      const requesterMember = { role: GroupRole.OWNER, userId: "owner" };
+      const targetMember = { role: GroupRole.MEMBER, userId: "u2" };
+
+      members.findOne
+        .mockResolvedValueOnce({ ...requesterMember }) // requester
+        .mockResolvedValueOnce({ ...targetMember }); // target
+
+      await service.transferOwnership("owner", "g1", "u2");
+
+      expect(members.save).toHaveBeenCalledTimes(2);
+      expect(groups.update).toHaveBeenCalledWith("g1", { createdById: "u2" });
+    });
+
+    it("forbids non-owners", async () => {
+      asMember();
+      await expect(service.transferOwnership("u1", "g1", "u2")).rejects.toThrow(
+        ForbiddenException,
+      );
+    });
+
+    it("throws BadRequest when transferring to self", async () => {
+      asOwner();
+      await expect(
+        service.transferOwnership("owner", "g1", "owner"),
+      ).rejects.toThrow("You are already the owner");
+    });
+
+    it("throws NotFound when target is not a member", async () => {
+      asOwner();
+      members.findOne.mockResolvedValueOnce({ role: GroupRole.OWNER });
+      members.findOne.mockResolvedValueOnce(null);
+      await expect(
+        service.transferOwnership("owner", "g1", "u2"),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
   describe("getGroupWishes", () => {
     it("returns wishes of all members, hiding other people's reservations", async () => {
       members.findOne.mockResolvedValue({ role: GroupRole.MEMBER });
@@ -259,9 +362,14 @@ describe("GroupsService", () => {
       const qb = createMockQueryBuilder([{ id: "w1" }]);
       wishes.createQueryBuilder.mockReturnValue(qb);
 
-      await expect(service.getGroupWishes("u1", "g1")).resolves.toEqual([
-        { id: "w1" },
-      ]);
+      const result = await service.getGroupWishes("u1", "g1", pagination);
+
+      expect(result).toBeInstanceOf(PaginatedResult);
+      expect(result.data).toHaveLength(1);
+      expect(result.total).toBe(1);
+      expect(result.page).toBe(1);
+      expect(result.limit).toBe(20);
+      expect(result.data[0]).toBeInstanceOf(WishResponseDto);
       expect(members.find).toHaveBeenCalledWith({
         where: { groupId: "g1" },
         select: ["userId"],
@@ -275,19 +383,93 @@ describe("GroupsService", () => {
       expect(qb.where).toHaveBeenCalledWith("wish.userId IN (:...memberIds)", {
         memberIds: ["u1", "u2"],
       });
+      expect(qb.skip).toHaveBeenCalledWith(0);
+      expect(qb.take).toHaveBeenCalledWith(20);
     });
 
     it("returns an empty list for a group without members", async () => {
       asMember();
       members.find.mockResolvedValue([]);
-      await expect(service.getGroupWishes("u1", "g1")).resolves.toEqual([]);
+      await expect(
+        service.getGroupWishes("u1", "g1", pagination),
+      ).resolves.toEqual(new PaginatedResult([], 0, 1, 20));
       expect(wishes.createQueryBuilder).not.toHaveBeenCalled();
     });
 
     it("forbids non-members", async () => {
       asOutsider();
-      await expect(service.getGroupWishes("u1", "g1")).rejects.toThrow(
-        ForbiddenException,
+      await expect(
+        service.getGroupWishes("u1", "g1", pagination),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it("uses default page and limit when not provided", async () => {
+      asMember();
+      members.find.mockResolvedValue([{ userId: "u1" }]);
+      const qb = createMockQueryBuilder([{ id: "w1" }]);
+      wishes.createQueryBuilder.mockReturnValue(qb);
+
+      await service.getGroupWishes("u1", "g1", {});
+
+      expect(qb.skip).toHaveBeenCalledWith(0);
+      expect(qb.take).toHaveBeenCalledWith(20);
+    });
+  });
+
+  describe("getMemberWishes", () => {
+    it("returns wishes of a specific member", async () => {
+      asMember();
+      members.findOne.mockResolvedValue({ groupId: "g1", userId: "u2" });
+      wishes.findAndCount.mockResolvedValue([[{ id: "w1" }], 1]);
+
+      const result = await service.getMemberWishes(
+        "u1",
+        "g1",
+        "u2",
+        pagination,
+      );
+
+      expect(result).toBeInstanceOf(PaginatedResult);
+      expect(result.data).toHaveLength(1);
+      expect(result.total).toBe(1);
+      expect(result.page).toBe(1);
+      expect(result.limit).toBe(20);
+      expect(result.data[0]).toBeInstanceOf(WishResponseDto);
+      expect(wishes.findAndCount).toHaveBeenCalledWith({
+        where: { userId: "u2" },
+        order: { id: "DESC" },
+        relations: ["user", "reservedBy"],
+        skip: 0,
+        take: 20,
+      });
+    });
+
+    it("throws ForbiddenException when requester is not a member", async () => {
+      asOutsider();
+      await expect(
+        service.getMemberWishes("u9", "g1", "u2", pagination),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it("throws NotFoundException when target member is not in group", async () => {
+      asMember();
+      members.findOne
+        .mockResolvedValueOnce({ role: GroupRole.MEMBER }) // requester check passes
+        .mockResolvedValueOnce(null); // target member not found
+      await expect(
+        service.getMemberWishes("u1", "g1", "u9", pagination),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it("uses default page and limit when not provided", async () => {
+      asMember();
+      members.findOne.mockResolvedValue({ groupId: "g1", userId: "u2" });
+      wishes.findAndCount.mockResolvedValue([[], 0]);
+
+      await service.getMemberWishes("u1", "g1", "u2", {});
+
+      expect(wishes.findAndCount).toHaveBeenCalledWith(
+        expect.objectContaining({ skip: 0, take: 20 }),
       );
     });
   });

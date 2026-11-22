@@ -15,7 +15,7 @@ export enum Priority {
 
 @Entity()
 export class WishItem {
-  @PrimaryGeneratedColumn()
+  @PrimaryGeneratedColumn("uuid")
   id: string;
 
   @Column()
@@ -35,6 +35,12 @@ export class WishItem {
 
   @Column({ default: false })
   isInCart: boolean;
+
+  @Column({ nullable: true })
+  occasion: string;
+
+  @Column({ type: "date", nullable: true })
+  occasionDate: Date | null;
 
   @Column({ nullable: true })
   userId: string;

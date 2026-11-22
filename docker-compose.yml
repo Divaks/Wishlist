@@ -4,13 +4,15 @@ services:
     container_name: wishlist-postgres
     restart: unless-stopped
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: wishlist
+      POSTGRES_USER: ${DB_USERNAME:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-password}
+      POSTGRES_DB: ${DB_NAME:-wishlist}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    env_file:
+      - .env
 
 volumes:
   postgres_data:

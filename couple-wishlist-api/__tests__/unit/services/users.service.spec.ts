@@ -1,13 +1,10 @@
 import { Test } from "@nestjs/testing";
 import { getRepositoryToken } from "@nestjs/typeorm";
-import {
-  BadRequestException,
-  ConflictException,
-  NotFoundException,
-} from "@nestjs/common";
+import { ConflictException, NotFoundException } from "@nestjs/common";
 import { QueryFailedError } from "typeorm";
 import { UsersService } from "../../../src/services/users.service";
 import { User } from "../../../src/models/user.model";
+import { UpdateUserDto } from "../../../src/dto/users/update-user.dto";
 import {
   createMockRepository,
   MockRepository,
@@ -42,6 +39,17 @@ describe("UsersService", () => {
       });
       expect(repo.save).toHaveBeenCalled();
       expect(result).toMatchObject({ email: "a@b.com", name: "Ann" });
+    });
+
+    it("lowercases email", async () => {
+      await service.create({
+        email: "A@B.COM",
+        password: "hashed",
+        name: "Ann",
+      });
+      expect(repo.create).toHaveBeenCalledWith(
+        expect.objectContaining({ email: "a@b.com" }),
+      );
     });
   });
 
@@ -95,52 +103,69 @@ describe("UsersService", () => {
       await service.findOneByEmailWithPassword("a@b.com");
       expect(repo.findOne).toHaveBeenCalledWith({
         where: { email: "a@b.com" },
-        select: ["id", "email", "password", "partnerId"],
+        select: ["id", "email", "password"],
       });
+    });
+
+    it("lowercases email in query", async () => {
+      repo.findOne.mockResolvedValue({ id: "1" });
+      await service.findOneByEmailWithPassword("A@B.COM");
+      expect(repo.findOne).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { email: "a@b.com" } }),
+      );
     });
   });
 
-  describe("generateInviteCode", () => {
-    it("stores and returns an 8-char upper-case code", async () => {
-      const { inviteCode } = await service.generateInviteCode("u1");
-      expect(inviteCode).toMatch(/^[A-Z0-9]{1,8}$/);
-      expect(repo.update).toHaveBeenCalledWith("u1", { inviteCode });
-    });
-
-    it("is derived from Math.random", async () => {
-      jest.spyOn(Math, "random").mockReturnValue(0.5);
-      const { inviteCode } = await service.generateInviteCode("u1");
-      expect(inviteCode).toBe((0.5).toString(36).substr(2, 8).toUpperCase());
-      jest.restoreAllMocks();
-    });
-  });
-
-  describe("connectPartner", () => {
-    it("links both users to each other", async () => {
-      repo.findOne.mockResolvedValue({ id: "partner" });
-      const result = await service.connectPartner("me", "CODE");
-      expect(repo.findOne).toHaveBeenCalledWith({
-        where: { inviteCode: "CODE" },
+  describe("updateProfile", () => {
+    it("updates name and birthday", async () => {
+      const user = { id: "u1", name: "Old", birthday: null };
+      repo.findOne.mockResolvedValue(user);
+      repo.save.mockResolvedValue({
+        ...user,
+        name: "New",
+        birthday: new Date("1990-01-01"),
       });
-      expect(repo.update).toHaveBeenCalledWith("me", { partnerId: "partner" });
-      expect(repo.update).toHaveBeenCalledWith("partner", { partnerId: "me" });
-      expect(result).toEqual({ inviteCode: "CODE" });
+
+      const dto: UpdateUserDto = { name: "New", birthday: "1990-01-01" };
+      const result = await service.updateProfile("u1", dto);
+
+      expect(result.name).toBe("New");
+      expect(result.birthday).toEqual(new Date("1990-01-01"));
+      expect(repo.save).toHaveBeenCalled();
     });
 
-    it("throws NotFound for an invalid code", async () => {
+    it("throws NotFound when user does not exist", async () => {
       repo.findOne.mockResolvedValue(null);
-      await expect(service.connectPartner("me", "BAD")).rejects.toThrow(
+      await expect(
+        service.updateProfile("u1", { name: "New" }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it("updates only provided fields", async () => {
+      const user = { id: "u1", name: "Old", birthday: new Date("1990-01-01") };
+      repo.findOne.mockResolvedValue(user);
+      repo.save.mockResolvedValue({ ...user, name: "New" });
+
+      const result = await service.updateProfile("u1", { name: "New" });
+
+      expect(result.name).toBe("New");
+      expect(result.birthday).toEqual(new Date("1990-01-01"));
+    });
+  });
+
+  describe("deleteAccount", () => {
+    it("removes the user", async () => {
+      const user = { id: "u1" };
+      repo.findOne.mockResolvedValue(user);
+      await service.deleteAccount("u1");
+      expect(repo.remove).toHaveBeenCalledWith(user);
+    });
+
+    it("throws NotFound when user does not exist", async () => {
+      repo.findOne.mockResolvedValue(null);
+      await expect(service.deleteAccount("u1")).rejects.toThrow(
         NotFoundException,
       );
-      expect(repo.update).not.toHaveBeenCalled();
-    });
-
-    it("throws BadRequest when using your own code", async () => {
-      repo.findOne.mockResolvedValue({ id: "me" });
-      await expect(service.connectPartner("me", "MINE")).rejects.toThrow(
-        BadRequestException,
-      );
-      expect(repo.update).not.toHaveBeenCalled();
     });
   });
 });

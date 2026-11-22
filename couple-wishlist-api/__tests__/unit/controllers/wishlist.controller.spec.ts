@@ -2,15 +2,16 @@ import { Test } from "@nestjs/testing";
 import { NotFoundException } from "@nestjs/common";
 import { WishlistController } from "../../../src/controllers/wishlist.controller";
 import { WishlistService } from "../../../src/services/wishlist.service";
+import { PaginationDto } from "../../../src/dto/common/pagination.dto";
 
 describe("WishlistController", () => {
   let controller: WishlistController;
   const service = {
     create: jest.fn(),
     findAll: jest.fn(),
+    findOne: jest.fn(),
     remove: jest.fn(),
     update: jest.fn(),
-    findPartnerWishlist: jest.fn(),
     reserveWish: jest.fn(),
     unreserveWish: jest.fn(),
   };
@@ -24,6 +25,8 @@ describe("WishlistController", () => {
     controller = module.get(WishlistController);
   });
 
+  const pagination: PaginationDto = { page: 1, limit: 20 };
+
   it("create", async () => {
     service.create.mockResolvedValue({ id: "1" });
     await expect(controller.create("u1", { title: "T" })).resolves.toEqual({
@@ -34,8 +37,14 @@ describe("WishlistController", () => {
 
   it("findAll", async () => {
     service.findAll.mockResolvedValue([]);
-    await controller.findAll("u1");
-    expect(service.findAll).toHaveBeenCalledWith("u1");
+    await controller.findAll("u1", pagination);
+    expect(service.findAll).toHaveBeenCalledWith("u1", pagination);
+  });
+
+  it("findOne", async () => {
+    service.findOne.mockResolvedValue({ id: "1", title: "Test" });
+    await controller.findOne("u1", "w1");
+    expect(service.findOne).toHaveBeenCalledWith("u1", "w1");
   });
 
   it("remove", async () => {
@@ -53,11 +62,6 @@ describe("WishlistController", () => {
   it("update", async () => {
     await controller.update("u1", "w1", { title: "New" });
     expect(service.update).toHaveBeenCalledWith("u1", "w1", { title: "New" });
-  });
-
-  it("getPartnerWishlist", async () => {
-    await controller.getPartnerWishlist("u1");
-    expect(service.findPartnerWishlist).toHaveBeenCalledWith("u1");
   });
 
   it("reserveWish", async () => {

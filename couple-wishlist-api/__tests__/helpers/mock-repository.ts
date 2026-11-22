@@ -2,6 +2,7 @@
 export const createMockRepository = () => ({
   find: jest.fn(),
   findOne: jest.fn(),
+  findAndCount: jest.fn(),
   create: jest.fn((entity: object) => ({ ...entity })),
   save: jest.fn((entity: object) => Promise.resolve(entity)),
   update: jest.fn(),
@@ -15,9 +16,18 @@ export type MockRepository = ReturnType<typeof createMockRepository>;
 /** Chainable query builder; every builder method returns itself. */
 export const createMockQueryBuilder = (result: unknown[] = []) => {
   const qb: Record<string, jest.Mock> = {};
-  for (const m of ["innerJoin", "leftJoinAndSelect", "where", "orderBy"]) {
+  for (const m of [
+    "innerJoin",
+    "leftJoinAndSelect",
+    "where",
+    "orderBy",
+    "skip",
+    "take",
+    "getManyAndCount",
+  ]) {
     qb[m] = jest.fn().mockReturnValue(qb);
   }
   qb.getMany = jest.fn().mockResolvedValue(result);
+  qb.getManyAndCount.mockResolvedValue([result, result.length]);
   return qb;
 };

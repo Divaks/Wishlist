@@ -5,10 +5,13 @@ import { Group } from "./models/group.model";
 import { GroupMember } from "./models/group-member.model";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { ConfigModule, ConfigService } from "@nestjs/config";
+import { ThrottlerModule, ThrottlerGuard } from "@nestjs/throttler";
+import { APP_GUARD } from "@nestjs/core";
 import { UsersModule } from "./modules/users.module";
 import { AuthModule } from "./modules/auth.module";
 import { WishlistModule } from "./modules/wishlist.module";
 import { GroupsModule } from "./modules/groups.module";
+import { HealthController } from "./controllers/health.controller";
 
 @Module({
   imports: [
@@ -24,18 +27,29 @@ import { GroupsModule } from "./modules/groups.module";
         port: Number(config.get<string>("DB_PORT", "5432")),
         username: config.get<string>("DB_USERNAME", "postgres"),
         password: config.get<string>("DB_PASSWORD"),
-        database: config.get<string>("DB_NAME", "wishlist_db"),
+        database: config.get<string>("DB_NAME", "wishlist"),
         autoLoadEntities: true,
         entities: [User, WishItem, Group, GroupMember],
-        synchronize: config.get<string>("DB_SYNCHRONIZE", "true") === "true",
+        synchronize: config.get<string>("DB_SYNCHRONIZE", "false") === "true",
       }),
     }),
+    ThrottlerModule.forRoot([
+      {
+        ttl: 60000,
+        limit: 100,
+      },
+    ]),
     UsersModule,
     AuthModule,
     WishlistModule,
     GroupsModule,
   ],
-  controllers: [],
-  providers: [],
+  controllers: [HealthController],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
+  ],
 })
 export class AppModule {}

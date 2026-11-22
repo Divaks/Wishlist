@@ -33,10 +33,9 @@ describe("AuthService", () => {
       id: "u1",
       email: "a@b.com",
       password: "hash",
-      partnerId: "p1",
     };
 
-    it("returns a signed token containing sub, email and partnerId", async () => {
+    it("returns a signed token containing sub and email", async () => {
       usersService.findOneByEmailWithPassword.mockResolvedValue(user);
       (bcryptMock.compare as jest.Mock).mockResolvedValue(true);
       jwtService.sign.mockReturnValue("jwt");
@@ -48,7 +47,6 @@ describe("AuthService", () => {
       expect(jwtService.sign).toHaveBeenCalledWith({
         sub: "u1",
         email: "a@b.com",
-        partnerId: "p1",
       });
     });
 
