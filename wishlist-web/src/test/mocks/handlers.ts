@@ -10,6 +10,7 @@ export const handlers = [
       { status: 201 },
     ),
   ),
+  http.get('*/api/groups/invitations', () => HttpResponse.json([])),
   http.get('*/api/groups', ({ request }) => {
     if (request.headers.get('Authorization') !== `Bearer ${mockAccessToken}`) {
       return new HttpResponse(null, { status: 401 })

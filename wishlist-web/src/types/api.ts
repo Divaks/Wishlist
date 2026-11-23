@@ -104,3 +104,27 @@ export type UpdateWishResponse = WishItem
 export type DeleteWishResponse = void
 export type ReserveWishResponse = WishItem
 export type UnreserveWishResponse = void
+
+export interface UpdateProfileRequest {
+  name?: string | null
+  birthday?: string | null
+}
+
+export type UpdateGroupRequest = Partial<CreateGroupRequest>
+
+export interface GroupInvitation {
+  groupId: string
+}
+
+export interface Page<T> {
+  data: T[]
+  total: number
+  page: number
+  limit: number
+  totalPages: number
+}
+
+export interface HealthResponse {
+  status: 'ok'
+  timestamp: string
+}

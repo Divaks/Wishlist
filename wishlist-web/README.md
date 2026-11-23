@@ -1,6 +1,6 @@
 # Wishlist Web
 
-React frontend for Wishlist, with a public home page, registration, and sign-in.
+React frontend for Wishlist with account, group, and wish management.
 
 ## Prerequisites
 
@@ -45,16 +45,16 @@ Vite exposes `VITE_*` variables to browser code. For deployment, configure the h
 
 ## Source layout
 
-| Directory         | Contents                                                                 |
-| ----------------- | ------------------------------------------------------------------------ |
-| `src/app/`        | Query client, router and authentication providers.                       |
-| `src/routes/`     | Route definitions and authentication guard.                              |
-| `src/features/`   | Home and authentication pages, group placeholders, and space for wishes. |
-| `src/components/` | Responsive layout shell and shadcn/ui primitives.                        |
-| `src/hooks/`      | Shared hooks, including `useAuth`.                                       |
-| `src/lib/api/`    | Typed JSON fetch client.                                                 |
-| `src/types/`      | Request and response types based on the current NestJS implementation.   |
-| `src/test/`       | Vitest setup, MSW handlers and tests.                                    |
+| Directory         | Contents                                                               |
+| ----------------- | ---------------------------------------------------------------------- |
+| `src/app/`        | Query client, router and authentication providers.                     |
+| `src/routes/`     | Route definitions and authentication guard.                            |
+| `src/features/`   | Home, authentication, profiles, groups, wishes and API diagnostics.    |
+| `src/components/` | Responsive layout shell and shadcn/ui primitives.                      |
+| `src/hooks/`      | Shared hooks, including `useAuth`.                                     |
+| `src/lib/api/`    | Typed JSON fetch client.                                               |
+| `src/types/`      | Request and response types based on the current NestJS implementation. |
+| `src/test/`       | Vitest setup, MSW handlers and tests.                                  |
 
 Tailwind CSS is configured in `src/index.css`. The shadcn/ui configuration lives in `components.json`, with Button, Input, Card and Label source in `src/components/ui/`.
 
@@ -64,3 +64,11 @@ Tailwind CSS is configured in `src/index.css`. The shadcn/ui configuration lives
 - `GET /users/profile` returns `{ userId, email, name, birthday }`. Group responses use `id` for their nested users.
 - `POST /groups/:id/members` returns a pending invitation. Delete group, delete wish and unreserve wish return HTTP 204.
 - The auth provider persists the token in local storage. An HTTP 401 for the current session clears the token and redirects to `/login`. Cookie-based auth and OpenAPI type generation depend on future backend support.
+
+## Check the frontend against the backend
+
+1. Open **API connection** to verify the health endpoint through the Vite proxy.
+2. Create two test accounts in separate browser sessions. In **Profile**, save a name and birthday, then reload to check persistence.
+3. Create a group and a wish as the first user. Invite the second user by email and accept the invitation in their **Groups** page. Pending invitations display a group ID because the API only returns the ID.
+4. As the second user, open the group, filter wishes by member, then reserve and cancel the first user's wish. Toggle **Paginate** in the group and wish lists to exercise the paged endpoints.
+5. As the owner, remove a member or transfer ownership. As a member, leave the group. Use the relevant owner session to delete the test group, then delete the test wishes and accounts.

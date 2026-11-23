@@ -3,8 +3,8 @@ const apiBaseUrl = (import.meta.env.VITE_API_URL ?? '/api').replace(/\/+$/, '')
 export class ApiError extends Error {
   readonly status: number
 
-  constructor(status: number) {
-    super(`API request failed with HTTP ${status}`)
+  constructor(status: number, message?: string) {
+    super(message || `API request failed with HTTP ${status}`)
     this.name = 'ApiError'
     this.status = status
   }
@@ -46,7 +46,20 @@ export async function requestApi<ResponseBody>(
     onUnauthorized()
   }
   if (!response.ok) {
-    throw new ApiError(response.status)
+    const payload: unknown = await response.json().catch(() => null)
+    const message =
+      payload && typeof payload === 'object' && 'message' in payload
+        ? payload.message
+        : undefined
+    const detail =
+      typeof message === 'string'
+        ? message
+        : Array.isArray(message)
+          ? message
+              .filter((part): part is string => typeof part === 'string')
+              .join(' ')
+          : undefined
+    throw new ApiError(response.status, detail)
   }
 
   const body = await response.text()

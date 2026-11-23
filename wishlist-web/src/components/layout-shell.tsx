@@ -12,11 +12,32 @@ export function LayoutShell() {
           <Link to="/" className="text-lg font-semibold tracking-tight">
             Wishlist
           </Link>
-          {accessToken && (
-            <Button variant="outline" onClick={() => setAccessToken(null)}>
-              Sign out
-            </Button>
-          )}
+          <nav
+            aria-label="Main"
+            className="flex flex-wrap items-center justify-end gap-3"
+          >
+            <Link className="underline" to="/connection">
+              API connection
+            </Link>
+            {accessToken && (
+              <>
+                <Link className="underline" to="/groups">
+                  Groups
+                </Link>
+                <Link className="underline" to="/wishlist">
+                  My wishes
+                </Link>
+                <Link className="underline" to="/profile">
+                  Profile
+                </Link>
+              </>
+            )}
+            {accessToken && (
+              <Button variant="outline" onClick={() => setAccessToken(null)}>
+                Sign out
+              </Button>
+            )}
+          </nav>
         </div>
       </header>
       <main className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
