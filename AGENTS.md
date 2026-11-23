@@ -544,3 +544,19 @@ Do not assume planned functionality already exists.
 Preserve existing behavior unless the task explicitly requires changing it.
 
 Never modify the backend during a frontend-only task.
+
+## Code Review Guidelines
+
+When reviewing pull requests:
+
+- Check compliance with AGENTS.md.
+- Identify security vulnerabilities and regressions.
+- Verify authentication and authorization.
+- Check for unauthorized access to other users' wishes.
+- Verify group membership and ownership checks.
+- Review TypeORM queries and database migrations.
+- Check backward compatibility of API endpoints.
+- Identify missing tests for critical business logic.
+- Report actionable findings with file and line references.
+- Do not report cosmetic or purely stylistic issues.
+- Do not modify the code during review.
