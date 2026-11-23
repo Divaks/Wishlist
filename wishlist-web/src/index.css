@@ -1,18 +1,17 @@
 @import 'tailwindcss';
 @import '@fontsource-variable/dm-sans';
-@import '@fontsource-variable/fraunces';
 
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme inline {
   --font-sans: 'DM Sans Variable', system-ui, sans-serif;
-  --font-display: 'Fraunces Variable', Georgia, serif;
+  --font-display: 'DM Sans Variable', system-ui, sans-serif;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
   --color-card-foreground: var(--foreground);
   --color-primary: var(--primary);
-  --color-primary-foreground: var(--foreground);
+  --color-primary-foreground: var(--primary-foreground);
   --color-secondary: var(--sand);
   --color-secondary-foreground: var(--foreground);
   --color-muted: var(--sand);
@@ -20,7 +19,9 @@
   --color-accent: var(--sand);
   --color-accent-foreground: var(--foreground);
   --color-reserved: var(--reserved);
+  --color-reserved-foreground: var(--reserved-foreground);
   --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
@@ -30,10 +31,13 @@
 }
 
 :root {
+  color-scheme: light;
   --background: #f8f5f2;
   --card: #ffffff;
   --primary: #c2858c;
+  --primary-foreground: #2e292a;
   --reserved: #7b9b8e;
+  --reserved-foreground: #2e292a;
   --sand: #ede5dc;
   --foreground: #2e292a;
   --muted-foreground: #665a5d;
@@ -41,7 +45,26 @@
   --input: #a79490;
   --ring: #88535c;
   --destructive: #963d49;
+  --destructive-foreground: #ffffff;
   --radius: 0.75rem;
+}
+
+.dark {
+  color-scheme: dark;
+  --background: #171412;
+  --card: #211d1a;
+  --sand: #2c2622;
+  --border: #362f2a;
+  --input: #362f2a;
+  --primary: #c97a7e;
+  --primary-foreground: #171412;
+  --reserved: #6e947b;
+  --reserved-foreground: #171412;
+  --foreground: #f2ece4;
+  --muted-foreground: #a3988e;
+  --ring: #c97a7e;
+  --destructive: #e7a0a5;
+  --destructive-foreground: #171412;
 }
 
 @layer base {
@@ -73,11 +96,11 @@
   }
 
   .page-title {
-    @apply font-display text-4xl leading-tight font-medium tracking-tight wrap-break-word sm:text-5xl;
+    @apply font-display text-4xl leading-tight font-semibold tracking-tight wrap-break-word sm:text-5xl;
   }
 
   .section-title {
-    @apply font-display text-2xl leading-tight font-medium;
+    @apply font-display text-2xl leading-tight font-semibold;
   }
 
   .panel {
@@ -104,7 +127,7 @@
   }
 
   .tag-reserved {
-    @apply bg-reserved;
+    @apply bg-reserved text-reserved-foreground;
   }
 
   .text-link {
@@ -116,7 +139,7 @@
   }
 
   .brand-mark {
-    @apply relative grid size-9 shrink-0 place-items-center rounded-xl bg-primary;
+    @apply relative grid size-9 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground;
   }
 
   .brand-box {

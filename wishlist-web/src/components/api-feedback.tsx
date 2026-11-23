@@ -1,5 +1,6 @@
 import type { UseQueryResult } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
+import { ActionNotice } from '@/components/action-notice'
 import { Button } from '@/components/ui/button'
 
 export function QueryContent<T>({
@@ -38,25 +39,31 @@ export function QueryContent<T>({
 
 export function ActionFeedback({
   action,
+  successMessage,
 }: {
   action: { isPending: boolean; isSuccess: boolean; error: Error | null }
+  successMessage: string
 }) {
   if (action.isPending)
     return (
-      <p role="status" className="text-sm text-muted-foreground">
-        Working…
-      </p>
+      <ActionNotice
+        title="Working…"
+        description="Please wait while your request is processed."
+      />
     )
   if (action.error)
     return (
-      <p role="alert" className="text-sm text-destructive">
-        {action.error.message}
-      </p>
+      <ActionNotice
+        title="Action failed"
+        description={action.error.message}
+        error
+      />
     )
   if (action.isSuccess)
     return (
-      <p role="status" className="text-sm text-muted-foreground">
-        Done.
-      </p>
+      <ActionNotice
+        title={successMessage}
+        description="Your request was completed successfully."
+      />
     )
 }

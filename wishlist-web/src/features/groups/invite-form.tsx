@@ -31,7 +31,12 @@ export function InviteForm({
       <fieldset disabled={disabled} className="grid gap-3">
         <label>
           Invite by email
-          <Input {...register('email')} type="email" required />
+          <Input
+            id="invite-email"
+            {...register('email')}
+            type="email"
+            required
+          />
         </label>
         <FormErrors errors={errors} />
         <Button type="submit" className="w-fit">

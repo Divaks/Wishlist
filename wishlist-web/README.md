@@ -57,7 +57,9 @@ Vite exposes `VITE_*` variables to browser code. For deployment, configure the h
 | `src/types/`      | Request and response types based on the current NestJS implementation. |
 | `src/test/`       | Vitest setup, MSW handlers and tests.                                  |
 
-The shared color tokens and DM Sans and Fraunces typography are configured in `src/index.css`. The gift image lives in `src/assets/`, and the font license notices live in `public/font-licenses/`. The shadcn/ui configuration lives in `components.json`, with Button, Input, Card and Label source in `src/components/ui/`.
+The shared color tokens and DM Sans typography are configured in `src/index.css`. The header theme button switches between light and dark themes and saves the choice in `wishlist.theme` in localStorage. Without a saved choice, the theme follows the system preference. The initial theme is applied in `index.html` before the app renders. The gift image lives in `src/assets/`, and the font license notices live in `public/font-licenses/`. The shadcn/ui configuration lives in `components.json`, with Button, Input, Card and Label source in `src/components/ui/`.
+
+Wish cards display prices in UAH and open store links in a new tab. The current API supplies no currency, image, or category fields, so cards use a generic gift icon instead of product previews.
 
 ## Routes
 
@@ -77,5 +79,5 @@ The shared color tokens and DM Sans and Fraunces typography are configured in `s
 1. Open **API connection** to verify the health endpoint through the Vite proxy.
 2. Create two test accounts in separate browser sessions. In **Profile**, save a name and birthday, then reload to check persistence.
 3. Create a group and a wish as the first user. Invite the second user by email and accept the invitation in their **Groups** page. Pending invitations display a group ID because the API only returns the ID.
-4. As the second user, open the group, filter wishes by member, then reserve and cancel the first user's wish. Toggle **Paginate** in the group and wish lists to exercise the paged endpoints.
+4. As the second user, open the group, filter wishes by member, then reserve and cancel the first user's wish. Lists use paged endpoints automatically; create more than five items to exercise **Previous** and **Next**. Group member filters are horizontal chips; manage members and invitations under **Members & Settings**.
 5. As the owner, remove a member or transfer ownership. As a member, leave the group. Use the relevant owner session to delete the test group, then delete the test wishes and accounts.

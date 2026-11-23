@@ -8,6 +8,7 @@ afterEach(() => {
   cleanup()
   server.resetHandlers()
   localStorage.clear()
+  document.documentElement.classList.remove('dark')
   window.history.replaceState(null, '', '/')
 })
 afterAll(() => server.close())

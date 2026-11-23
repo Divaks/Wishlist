@@ -1,4 +1,5 @@
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
+import { ThemeToggle } from '@/components/theme-toggle'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/hooks/use-auth'
 
@@ -50,17 +51,20 @@ export function LayoutShell() {
                   </NavLink>
                 ))}
               </nav>
+            </>
+          ) : null}
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            {accessToken ? (
               <Button variant="outline" onClick={() => setAccessToken(null)}>
                 Sign out
               </Button>
-            </>
-          ) : (
-            !isAuthPage && (
+            ) : !isAuthPage ? (
               <Button asChild variant="outline">
                 <Link to="/login">Log in</Link>
               </Button>
-            )
-          )}
+            ) : null}
+          </div>
         </div>
       </header>
       <main

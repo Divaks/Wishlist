@@ -1,7 +1,9 @@
+import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ActionFeedback, QueryContent } from '@/components/api-feedback'
 import { ApiList } from '@/components/api-list'
 import { Button } from '@/components/ui/button'
+import { GroupNotice } from '@/features/groups/group-notice'
 import { GroupForm } from '@/features/groups/group-form'
 import { GroupWishes } from '@/features/groups/group-wishes'
 import { InviteForm } from '@/features/groups/invite-form'
@@ -25,14 +27,11 @@ export function GroupsPage() {
   return (
     <div className="space-y-6">
       <h1 className="page-title">Groups</h1>
+      <GroupNotice />
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <section className="space-y-3">
           <h2 className="section-title">My groups</h2>
-          <ApiList<Group>
-            path="/groups"
-            pagedPath="/groups/paged"
-            empty="No groups yet."
-          >
+          <ApiList<Group> pagedPath="/groups/paged" empty="No groups yet.">
             {(items) => (
               <ul className="card-grid">
                 {items.map((group) => (
@@ -68,11 +67,13 @@ export function GroupsPage() {
                     method: 'POST',
                     json,
                   })
-                  void navigate(`/groups/${group.id}`)
+                  void navigate(`/groups/${group.id}`, {
+                    state: { groupNotice: 'created' },
+                  })
                 })
               }
             />
-            <ActionFeedback action={create} />
+            <ActionFeedback action={create} successMessage="Group created" />
           </section>
           <section className="panel">
             <h2 className="section-title">Invitations</h2>
@@ -97,7 +98,9 @@ export function GroupsPage() {
                                 `/groups/${groupId}/invitations/accept`,
                                 { method: 'POST' },
                               )
-                              void navigate(`/groups/${groupId}`)
+                              void navigate(`/groups/${groupId}`, {
+                                state: { groupNotice: 'accepted' },
+                              })
                             })
                           }
                         >
@@ -111,7 +114,10 @@ export function GroupsPage() {
                 )
               }
             </QueryContent>
-            <ActionFeedback action={accept} />
+            <ActionFeedback
+              action={accept}
+              successMessage="Invitation accepted"
+            />
           </section>
         </div>
       </div>
@@ -123,14 +129,24 @@ function GroupDetails({ group, userId }: { group: Group; userId: string }) {
   const { api } = useAuth()
   const navigate = useNavigate()
   const action = useApiAction('groups')
+  const [successMessage, setSuccessMessage] = useState('Group updated')
+  const [view, setView] = useState<'wishes' | 'settings'>('wishes')
+
+  function runAction(message: string, request: () => Promise<unknown>) {
+    setSuccessMessage(message)
+    action.mutate(request)
+  }
   const isOwner = group.createdById === userId
   const path = `/groups/${group.id}` as const
 
   function exitGroup() {
     if (window.confirm(isOwner ? 'Delete this group?' : 'Leave this group?')) {
-      action.mutate(async () => {
+      runAction(isOwner ? 'Group deleted' : 'Group left', async () => {
         await api<void>(isOwner ? path : `${path}/leave`, { method: 'DELETE' })
-        void navigate('/groups', { replace: true })
+        void navigate('/groups', {
+          replace: true,
+          state: { groupNotice: isOwner ? 'deleted' : 'left' },
+        })
       })
     }
   }
@@ -143,9 +159,82 @@ function GroupDetails({ group, userId }: { group: Group; userId: string }) {
           {group.description}
         </p>
       )}
-      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <ul aria-label="Group members" className="flex -space-x-2">
+          {group.members.slice(0, 6).map((member) => {
+            const name = member.user.name || member.user.email
+            return (
+              <li
+                key={member.id}
+                title={name}
+                className="flex size-10 items-center justify-center rounded-full border-2 border-background bg-secondary text-sm font-bold"
+              >
+                <span className="sr-only">{name}</span>
+                <span aria-hidden="true">
+                  {name
+                    .trim()
+                    .split(/\s+/)
+                    .slice(0, 2)
+                    .map((part) => part[0])
+                    .join('')
+                    .toUpperCase()}
+                </span>
+              </li>
+            )
+          })}
+          {group.members.length > 6 && (
+            <li className="flex size-10 items-center justify-center rounded-full border-2 border-background bg-secondary text-sm font-semibold">
+              +{group.members.length - 6}
+            </li>
+          )}
+        </ul>
+        {isOwner && (
+          <Button
+            variant="outline"
+            onClick={() => {
+              setView('settings')
+              requestAnimationFrame(() =>
+                document.getElementById('invite-email')?.focus(),
+              )
+            }}
+          >
+            + Invite
+          </Button>
+        )}
+      </div>
+      <nav aria-label="Group sections" className="flex gap-2 border-b pb-3">
+        <Button
+          id="group-wishes-view"
+          variant={view === 'wishes' ? 'default' : 'ghost'}
+          aria-pressed={view === 'wishes'}
+          aria-controls="group-wishes-panel"
+          onClick={() => setView('wishes')}
+        >
+          Wishes
+        </Button>
+        <Button
+          id="group-settings-view"
+          variant={view === 'settings' ? 'default' : 'ghost'}
+          aria-pressed={view === 'settings'}
+          aria-controls="group-settings-panel"
+          onClick={() => setView('settings')}
+        >
+          Members &amp; Settings
+        </Button>
+      </nav>
+      <section
+        id="group-wishes-panel"
+        aria-labelledby="group-wishes-view"
+        hidden={view !== 'wishes'}
+      >
         <GroupWishes group={group} userId={userId} />
-        <div className="min-w-0 space-y-5">
+      </section>
+      <section
+        id="group-settings-panel"
+        aria-labelledby="group-settings-view"
+        hidden={view !== 'settings'}
+      >
+        <div className="mx-auto max-w-3xl space-y-5">
           {isOwner && (
             <section className="panel">
               <h2 className="section-title">Edit group</h2>
@@ -153,7 +242,7 @@ function GroupDetails({ group, userId }: { group: Group; userId: string }) {
                 group={group}
                 disabled={action.isPending}
                 onSave={(json) =>
-                  action.mutate(() =>
+                  runAction('Group updated', () =>
                     api<Group>(path, { method: 'PATCH', json }),
                   )
                 }
@@ -185,7 +274,7 @@ function GroupDetails({ group, userId }: { group: Group; userId: string }) {
                               'Transfer group ownership to this member?',
                             )
                           )
-                            action.mutate(() =>
+                            runAction('Ownership transferred', () =>
                               api<void>(
                                 `${path}/members/${member.userId}/transfer-ownership`,
                                 { method: 'POST' },
@@ -200,7 +289,7 @@ function GroupDetails({ group, userId }: { group: Group; userId: string }) {
                         disabled={action.isPending}
                         onClick={() => {
                           if (window.confirm('Remove this member?'))
-                            action.mutate(() =>
+                            runAction('Member removed', () =>
                               api<void>(`${path}/members/${member.userId}`, {
                                 method: 'DELETE',
                               }),
@@ -218,7 +307,7 @@ function GroupDetails({ group, userId }: { group: Group; userId: string }) {
               <InviteForm
                 disabled={action.isPending}
                 onInvite={(json) =>
-                  action.mutate(() =>
+                  runAction('Invitation sent', () =>
                     api<InviteMemberResponse>(`${path}/members`, {
                       method: 'POST',
                       json,
@@ -235,9 +324,9 @@ function GroupDetails({ group, userId }: { group: Group; userId: string }) {
           >
             {isOwner ? 'Delete group' : 'Leave group'}
           </Button>
-          <ActionFeedback action={action} />
+          <ActionFeedback action={action} successMessage={successMessage} />
         </div>
-      </div>
+      </section>
     </>
   )
 }
@@ -254,6 +343,7 @@ export function GroupPage() {
       <Link className="text-link text-sm" to="/groups">
         Back to groups
       </Link>
+      <GroupNotice />
       <QueryContent query={group}>
         {(data) => (
           <QueryContent query={profile}>

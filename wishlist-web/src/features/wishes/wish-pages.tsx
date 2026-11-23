@@ -1,7 +1,8 @@
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ActionFeedback, QueryContent } from '@/components/api-feedback'
+import { QueryContent } from '@/components/api-feedback'
 import { ApiList } from '@/components/api-list'
 import { Button } from '@/components/ui/button'
+import { WishFeedback } from '@/features/wishes/wish-feedback'
 import { WishForm } from '@/features/wishes/wish-form'
 import { WishSummary } from '@/features/wishes/wish-summary'
 import { useApiAction } from '@/hooks/use-api-action'
@@ -17,14 +18,11 @@ export function WishlistPage() {
   return (
     <div className="space-y-6">
       <h1 className="page-title">My wishes</h1>
+      <WishFeedback action={action} />
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <section className="min-w-0 space-y-4">
           <h2 className="section-title">Saved wishes</h2>
-          <ApiList<WishItem>
-            path="/wishlist"
-            pagedPath="/wishlist/paged"
-            empty="No wishes yet."
-          >
+          <ApiList<WishItem> pagedPath="/wishlist/paged" empty="No wishes yet.">
             {(items) => (
               <ul className="card-grid">
                 {items.map((wish) => (
@@ -46,11 +44,12 @@ export function WishlistPage() {
                   method: 'POST',
                   json,
                 })
-                void navigate(`/wishlist/${wish.id}`)
+                void navigate(`/wishlist/${wish.id}`, {
+                  state: { wishNotice: 'created' },
+                })
               })
             }
           />
-          <ActionFeedback action={action} />
         </section>
       </div>
     </div>
@@ -71,6 +70,7 @@ export function WishPage() {
         Back to my wishes
       </Link>
       <h1 className="page-title">Wish details</h1>
+      <WishFeedback action={action} />
       <QueryContent query={query}>
         {(wish) => (
           <div className="panel">
@@ -93,7 +93,10 @@ export function WishPage() {
                 if (window.confirm('Delete this wish?'))
                   action.mutate(async () => {
                     await api<void>(`/wishlist/${id}`, { method: 'DELETE' })
-                    void navigate('/wishlist', { replace: true })
+                    void navigate('/wishlist', {
+                      replace: true,
+                      state: { wishNotice: 'deleted' },
+                    })
                   })
               }}
             >
@@ -102,7 +105,6 @@ export function WishPage() {
           </div>
         )}
       </QueryContent>
-      <ActionFeedback action={action} />
     </div>
   )
 }

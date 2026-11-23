@@ -14,6 +14,7 @@ export function GroupWishes({
   group: Group
   userId: string
 }) {
+  const [successMessage, setSuccessMessage] = useState('Reservation updated')
   const [selectedMember, setSelectedMember] = useState('')
   const memberId = group.members.some(
     (member) => member.userId === selectedMember,
@@ -27,43 +28,50 @@ export function GroupWishes({
   return (
     <section className="min-w-0 space-y-4">
       <h2 className="section-title">Group wishes</h2>
-      <div className="flex flex-wrap items-center gap-2">
-        <label htmlFor="wishlist-owner">Wishlist owner</label>
-        <select
-          id="wishlist-owner"
-          className="max-w-full rounded-md border border-input bg-card px-3 py-2 text-sm"
-          value={memberId}
-          onChange={(event) => setSelectedMember(event.target.value)}
+      <div
+        aria-label="Wishlist owner"
+        className="flex gap-2 overflow-x-auto pb-2"
+      >
+        <Button
+          variant={memberId === '' ? 'default' : 'outline'}
+          aria-pressed={memberId === ''}
+          onClick={() => setSelectedMember('')}
         >
-          <option value="">All members</option>
-          {group.members.map((member) => (
-            <option key={member.userId} value={member.userId}>
-              {member.user.name || member.user.email}
-            </option>
-          ))}
-        </select>
+          All members
+        </Button>
+        {group.members.map((member) => (
+          <Button
+            key={member.userId}
+            variant={memberId === member.userId ? 'default' : 'outline'}
+            aria-pressed={memberId === member.userId}
+            onClick={() => setSelectedMember(member.userId)}
+          >
+            {member.user.name || member.user.email}
+          </Button>
+        ))}
       </div>
       <ApiList<WishItem>
         key={memberId}
-        path={memberId ? undefined : path}
         pagedPath={memberId ? `${path}/${memberId}` : `${path}/paged`}
         empty="No wishes here yet."
       >
         {(items) => (
-          <ul className="card-grid">
+          <ul className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
             {items.map((wish) => (
-              <li key={wish.id} className="item-card">
-                <WishSummary wish={wish} />
-                <p className="tag">
-                  Wish by{' '}
-                  {wish.user?.name ||
-                    group.members.find(
-                      (member) => member.userId === wish.userId,
-                    )?.user.email ||
-                    'a member'}
+              <li key={wish.id} className="item-card flex flex-col">
+                <p className="rounded-lg bg-secondary px-3 py-2 text-base wrap-anywhere">
+                  <span className="text-sm">Wish by</span>{' '}
+                  <span className="font-bold">
+                    {wish.user?.name ||
+                      group.members.find(
+                        (member) => member.userId === wish.userId,
+                      )?.user.email ||
+                      'a member'}
+                  </span>
                 </p>
+                <WishSummary wish={wish} />
                 {wish.userId !== userId && (
-                  <div className="flex flex-wrap items-center gap-2 border-t pt-3">
+                  <div className="mt-auto flex flex-wrap items-center gap-2 border-t pt-3">
                     {wish.isReserved && (
                       <p className="tag tag-reserved">
                         {wish.reservedById === userId
@@ -73,9 +81,19 @@ export function GroupWishes({
                     )}
                     {(!wish.isReserved || wish.reservedById === userId) && (
                       <Button
-                        variant={wish.isReserved ? 'outline' : 'default'}
+                        variant={wish.isReserved ? 'ghost' : 'default'}
+                        className={
+                          wish.isReserved
+                            ? 'hover:bg-destructive/10 hover:text-destructive'
+                            : undefined
+                        }
                         disabled={action.isPending}
-                        onClick={() =>
+                        onClick={() => {
+                          setSuccessMessage(
+                            wish.isReserved
+                              ? 'Reservation cancelled'
+                              : 'Wish reserved',
+                          )
                           action.mutate(() =>
                             api<WishItem | void>(
                               `/wishlist/${wish.id}/reserve`,
@@ -84,7 +102,7 @@ export function GroupWishes({
                               },
                             ),
                           )
-                        }
+                        }}
                       >
                         {wish.isReserved
                           ? 'Cancel reservation'
@@ -98,7 +116,7 @@ export function GroupWishes({
           </ul>
         )}
       </ApiList>
-      <ActionFeedback action={action} />
+      <ActionFeedback action={action} successMessage={successMessage} />
     </section>
   )
 }

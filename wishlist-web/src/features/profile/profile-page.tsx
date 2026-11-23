@@ -77,7 +77,7 @@ function ProfileForm({ profile }: { profile: ProfileResponse }) {
       >
         Delete account
       </Button>
-      <ActionFeedback action={action} />
+      <ActionFeedback action={action} successMessage="Profile updated" />
     </div>
   )
 }
