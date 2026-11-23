@@ -15,7 +15,7 @@ The repository is a monorepo containing:
 
 - Every user has a unique ID and their own account.
 - Users can create and manage groups.
-- Users can invite other users to groups.
+- Group owners invite existing users by email. A pending invitation grants no access until the recipient accepts it.
 - Users belonging to the same group can view each other's wish lists.
 - Users can create, edit, and delete their own wishes.
 - Every wish must be associated with its creator through a `userId` or equivalent ownership field.
@@ -75,7 +75,7 @@ Code quality:
 - Prettier
 
 Runtime:
-- Node.js 22 or 24 LTS
+- Node.js 22 LTS, as pinned by `wishlist-web/.nvmrc`
 - npm
 
 Use the versions and package manager already configured in the respective application.
@@ -102,28 +102,36 @@ Wishlist/
 └── AGENTS.md
 ```
 
-The frontend should follow this structure:
+The frontend source and configuration are organized as follows:
 
 ```text
 wishlist-web/
-├── public/
+├── public/font-licenses/
 ├── src/
 │   ├── app/
+│   ├── assets/
 │   ├── routes/
 │   ├── features/
 │   │   ├── auth/
+│   │   ├── connection/
+│   │   ├── home/
 │   │   ├── groups/
+│   │   ├── profile/
 │   │   └── wishes/
 │   ├── components/
 │   │   └── ui/
 │   ├── lib/
 │   │   └── api/
 │   ├── hooks/
+│   ├── test/
 │   ├── types/
+│   ├── index.css
 │   └── main.tsx
 ├── .env.example
 ├── .nvmrc
 ├── package.json
+├── package-lock.json
+├── components.json
 ├── README.md
 └── vite.config.ts
 ```
@@ -254,14 +262,9 @@ Do not introduce Redux or another global state management library without a clea
 
 Use React Router.
 
-Initial routes:
+Public routes are `/`, `/connection`, `/login`, and `/register`. Signed-in users visiting the auth pages go to `/`.
 
-- `/login`
-- `/register`
-- `/groups`
-- `/groups/:groupId`
-
-Implement a `ProtectedRoute` wrapper for authenticated routes.
+`ProtectedRoute` guards `/profile`, `/groups`, `/groups/:groupId`, `/wishlist`, and `/wishlist/:wishId`. Unknown URLs redirect to `/`.
 
 Authentication state must be checked before rendering protected content.
 
@@ -273,7 +276,7 @@ Do not rely on frontend route protection as a substitute for backend authorizati
 
 Use a small React Context for authentication state.
 
-Initial implementation:
+Current implementation:
 
 - Store the access token in memory.
 - Persist the token in localStorage.
@@ -305,23 +308,16 @@ Requirements:
 
 Use TypeScript interfaces for API request and response models.
 
-Initial backend contract:
+Current API behavior:
 
-- `POST /auth/register` — `{ email, password, name? }`
-- `POST /auth/login` — returns `{ accessToken }`
-- `GET /groups`
-- `POST /groups`
-- `GET /groups/:id`
-- `POST /groups/:id/members` — `{ email }`
-- `GET /groups/:id/wishes`
-- `POST /wishlist`
-- `GET /wishlist`
-- `PATCH /wishlist/:id`
-- `DELETE /wishlist/:id`
-- `POST /wishlist/:id/reserve`
-- `DELETE /wishlist/:id/reserve`
+- Registration returns `{ id, email, name }`. A separate login returns `{ accessToken }` with HTTP 201.
+- Profile and account operations use `/users/profile` and `/users/account`. The profile GET response uses `userId`. Account deletion returns 409 while the user owns a group.
+- `/groups` covers group CRUD, pending invitations, acceptance, member removal, ownership transfer, and leaving. Group wish lists support filtering by member.
+- `/wishlist` covers personal wish CRUD. Reserve and cancel use `/wishlist/:id/reserve`. The owner cannot see whether their wish is reserved. Other members see its reservation status, and only the reserving user sees their own reservation identity.
+- List endpoints return arrays. Their `/paged` variants and `/groups/:groupId/wishes/:memberId` return `{ data, total, page, limit, totalPages }`. Handle HTTP 204 for operations with no response body.
+- `GET /health` is public and powers the frontend's `/connection` page.
 
-Treat these endpoints as an initial contract, not an immutable specification.
+Maintain frontend DTOs in `wishlist-web/src/types/api.ts` against the controllers, DTOs, and services. Route server state through the shared query and mutation hooks.
 
 Inspect the actual backend implementation before integrating an endpoint.
 
@@ -345,7 +341,7 @@ Design principles:
 - Accessible controls and forms.
 - Clear loading, error, empty, and success states.
 - Reusable UI components.
-- Consistent design system using Tailwind CSS and shadcn/ui.
+- Use the shared palette and typography in `wishlist-web/src/index.css` with Tailwind CSS and shadcn/ui. Use the reserved color for reservation status and the sand color for tags.
 
 Avoid excessive animations and unnecessary visual complexity.
 
@@ -384,12 +380,9 @@ Do not mock everything unnecessarily. Use MSW for API-level behavior.
 - Keep frontend and backend configuration separate.
 - Preserve compatibility with Docker Compose.
 
-Node.js version:
+The backend reads the root `.env` when launched from `couple-wishlist-api/`. Compose uses the same file for PostgreSQL initialization. Set frontend overrides in `wishlist-web/.env.local` and treat every `VITE_*` value as public.
 
-- Use Node.js 22 or 24 LTS for the frontend.
-- Add `.nvmrc`.
-- Specify the appropriate `engines` field in `package.json`.
-- Use the same Node version in frontend CI.
+Follow the [root setup guide](README.md#локальний-запуск) and the [frontend README](wishlist-web/README.md). CI uses Node.js 24 for the backend and the frontend's `.nvmrc` for the frontend.
 
 ---
 
@@ -439,8 +432,9 @@ Inspect the actual scripts before execution.
 Run commands from `wishlist-web/`.
 
 - `npm run lint`
-- `npm run format`
-- `npm run test`
+- `npm run typecheck`
+- `npm run format:check`
+- `npm test`
 - `npm run build`
 
 Also verify that the Vite development server starts successfully.
@@ -470,7 +464,7 @@ When modifying CI:
 - Add or modify frontend jobs independently.
 - Use the frontend's configured Node.js version.
 - Install dependencies using the correct package manager.
-- Run frontend lint, tests, and build.
+- Run frontend typecheck, lint, tests, and build. The backend job runs lint, unit tests with coverage, build, and PostgreSQL E2E.
 - Avoid breaking existing backend CI.
 
 ---
@@ -550,3 +544,19 @@ Do not assume planned functionality already exists.
 Preserve existing behavior unless the task explicitly requires changing it.
 
 Never modify the backend during a frontend-only task.
+
+## Code Review Guidelines
+
+When reviewing pull requests:
+
+- Check compliance with AGENTS.md.
+- Identify security vulnerabilities and regressions.
+- Verify authentication and authorization.
+- Check for unauthorized access to other users' wishes.
+- Verify group membership and ownership checks.
+- Review TypeORM queries and database migrations.
+- Check backward compatibility of API endpoints.
+- Identify missing tests for critical business logic.
+- Report actionable findings with file and line references.
+- Do not report cosmetic or purely stylistic issues.
+- Do not modify the code during review.
