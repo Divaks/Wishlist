@@ -9,12 +9,19 @@ export function QueryContent<T>({
   query: UseQueryResult<T>
   children: (data: T) => ReactNode
 }) {
-  if (query.isPending) return <p role="status">Loading…</p>
+  if (query.isPending)
+    return (
+      <p role="status" className="empty-state">
+        Loading…
+      </p>
+    )
 
   if (query.isError) {
     return (
-      <div>
-        <p role="alert">{query.error.message}</p>
+      <div className="space-y-3 rounded-lg border border-destructive/25 bg-card p-4">
+        <p role="alert" className="text-sm text-destructive">
+          {query.error.message}
+        </p>
         <Button
           type="button"
           variant="outline"
@@ -34,7 +41,22 @@ export function ActionFeedback({
 }: {
   action: { isPending: boolean; isSuccess: boolean; error: Error | null }
 }) {
-  if (action.isPending) return <p role="status">Working…</p>
-  if (action.error) return <p role="alert">{action.error.message}</p>
-  if (action.isSuccess) return <p role="status">Done.</p>
+  if (action.isPending)
+    return (
+      <p role="status" className="text-sm text-muted-foreground">
+        Working…
+      </p>
+    )
+  if (action.error)
+    return (
+      <p role="alert" className="text-sm text-destructive">
+        {action.error.message}
+      </p>
+    )
+  if (action.isSuccess)
+    return (
+      <p role="status" className="text-sm text-muted-foreground">
+        Done.
+      </p>
+    )
 }

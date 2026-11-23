@@ -15,45 +15,44 @@ export function WishlistPage() {
   const action = useApiAction('wishlist', 'groups')
 
   return (
-    <div className="space-y-5">
-      <h1 className="text-xl font-semibold">My wishes</h1>
-      <section className="space-y-3">
-        <h2 className="font-semibold">New wish</h2>
-        <WishForm
-          disabled={action.isPending}
-          onSave={(json) =>
-            action.mutate(async () => {
-              const wish = await api<WishItem>('/wishlist', {
-                method: 'POST',
-                json,
+    <div className="space-y-6">
+      <h1 className="page-title">My wishes</h1>
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+        <section className="min-w-0 space-y-4">
+          <h2 className="section-title">Saved wishes</h2>
+          <ApiList<WishItem>
+            path="/wishlist"
+            pagedPath="/wishlist/paged"
+            empty="No wishes yet."
+          >
+            {(items) => (
+              <ul className="card-grid">
+                {items.map((wish) => (
+                  <li key={wish.id} className="item-card">
+                    <WishSummary wish={wish} titleLink={wish.id} />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </ApiList>
+        </section>
+        <section className="panel">
+          <h2 className="section-title">New wish</h2>
+          <WishForm
+            disabled={action.isPending}
+            onSave={(json) =>
+              action.mutate(async () => {
+                const wish = await api<WishItem>('/wishlist', {
+                  method: 'POST',
+                  json,
+                })
+                void navigate(`/wishlist/${wish.id}`)
               })
-              void navigate(`/wishlist/${wish.id}`)
-            })
-          }
-        />
-        <ActionFeedback action={action} />
-      </section>
-      <section className="space-y-3">
-        <h2 className="font-semibold">Saved wishes</h2>
-        <ApiList<WishItem>
-          path="/wishlist"
-          pagedPath="/wishlist/paged"
-          empty="No wishes yet."
-        >
-          {(items) => (
-            <ul className="space-y-3">
-              {items.map((wish) => (
-                <li key={wish.id}>
-                  <Link className="underline" to={wish.id}>
-                    {wish.title}
-                  </Link>{' '}
-                  · {wish.price}
-                </li>
-              ))}
-            </ul>
-          )}
-        </ApiList>
-      </section>
+            }
+          />
+          <ActionFeedback action={action} />
+        </section>
+      </div>
     </div>
   )
 }
@@ -67,15 +66,16 @@ export function WishPage() {
   const action = useApiAction('wishlist', 'groups')
 
   return (
-    <div className="space-y-4">
-      <Link className="underline" to="/wishlist">
+    <div className="mx-auto max-w-3xl space-y-5">
+      <Link className="text-link text-sm" to="/wishlist">
         Back to my wishes
       </Link>
-      <h1 className="text-xl font-semibold">Wish details</h1>
+      <h1 className="page-title">Wish details</h1>
       <QueryContent query={query}>
         {(wish) => (
-          <>
-            <WishSummary wish={wish} />
+          <div className="panel">
+            <WishSummary wish={wish} heading="h2" />
+            <hr className="my-5 border-border" />
             <WishForm
               key={wish.id}
               wish={wish}
@@ -99,7 +99,7 @@ export function WishPage() {
             >
               Delete wish
             </Button>
-          </>
+          </div>
         )}
       </QueryContent>
       <ActionFeedback action={action} />

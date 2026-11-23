@@ -26,7 +26,7 @@ export function ApiList<T>({
   return (
     <div className="space-y-3">
       {path && (
-        <label className="flex items-center gap-2">
+        <label className="inline-flex items-center gap-2 rounded-full bg-secondary px-3 py-1.5 text-sm font-medium">
           <input
             type="checkbox"
             checked={paged}
@@ -43,7 +43,11 @@ export function ApiList<T>({
           const items = Array.isArray(data) ? data : data.data
           return (
             <>
-              {items.length ? children(items) : <p>{empty}</p>}
+              {items.length ? (
+                children(items)
+              ) : (
+                <p className="empty-state">{empty}</p>
+              )}
               {!Array.isArray(data) && (
                 <div className="flex flex-wrap items-center gap-2">
                   <Button

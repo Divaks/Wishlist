@@ -1,20 +1,25 @@
 @import 'tailwindcss';
+@import '@fontsource-variable/dm-sans';
+@import '@fontsource-variable/fraunces';
 
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme inline {
+  --font-sans: 'DM Sans Variable', system-ui, sans-serif;
+  --font-display: 'Fraunces Variable', Georgia, serif;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
+  --color-card-foreground: var(--foreground);
   --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-muted: var(--muted);
+  --color-primary-foreground: var(--foreground);
+  --color-secondary: var(--sand);
+  --color-secondary-foreground: var(--foreground);
+  --color-muted: var(--sand);
   --color-muted-foreground: var(--muted-foreground);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--sand);
+  --color-accent-foreground: var(--foreground);
+  --color-reserved: var(--reserved);
   --color-destructive: var(--destructive);
   --color-border: var(--border);
   --color-input: var(--input);
@@ -25,48 +30,125 @@
 }
 
 :root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: var(--background);
-  --card-foreground: var(--foreground);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: var(--primary);
-  --muted: var(--secondary);
-  --muted-foreground: oklch(0.45 0 0);
-  --accent: var(--secondary);
-  --accent-foreground: var(--primary);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.708 0 0);
-  --ring: oklch(0.556 0 0);
-}
-
-.dark {
-  color-scheme: dark;
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: var(--foreground);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent-foreground: var(--foreground);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 30%);
-  --ring: oklch(0.556 0 0);
+  --background: #f8f5f2;
+  --card: #ffffff;
+  --primary: #c2858c;
+  --reserved: #7b9b8e;
+  --sand: #ede5dc;
+  --foreground: #2e292a;
+  --muted-foreground: #665a5d;
+  --border: #e3d7cc;
+  --input: #a79490;
+  --ring: #88535c;
+  --destructive: #963d49;
+  --radius: 0.75rem;
 }
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border;
   }
 
   body {
-    @apply bg-background text-foreground antialiased;
+    @apply bg-background font-sans text-foreground antialiased;
+  }
+
+  ::selection {
+    @apply bg-secondary text-foreground;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 3px;
+  }
+
+  input[type='checkbox'] {
+    accent-color: var(--ring);
+  }
+}
+
+@layer components {
+  .site-container {
+    @apply mx-auto w-full max-w-7xl px-4 sm:px-8 lg:px-12;
+  }
+
+  .page-title {
+    @apply font-display text-4xl leading-tight font-medium tracking-tight wrap-break-word sm:text-5xl;
+  }
+
+  .section-title {
+    @apply font-display text-2xl leading-tight font-medium;
+  }
+
+  .panel {
+    @apply min-w-0 space-y-4 rounded-2xl border bg-card p-5 sm:p-6;
+    box-shadow: 0 3px 14px #2e292a06;
+  }
+
+  .panel label:has([data-slot='input']) {
+    @apply grid gap-1.5 text-sm font-semibold;
+  }
+
+  .card-grid {
+    @apply grid gap-4;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 16rem), 1fr));
+  }
+
+  .item-card {
+    @apply min-w-0 space-y-4 rounded-xl border bg-card p-5 wrap-break-word;
+    box-shadow: 0 3px 12px #2e292a07;
+  }
+
+  .tag {
+    @apply inline-block max-w-full rounded-full bg-secondary px-3 py-1 text-xs leading-snug font-semibold wrap-anywhere;
+  }
+
+  .tag-reserved {
+    @apply bg-reserved;
+  }
+
+  .text-link {
+    @apply font-semibold underline decoration-ring/45 underline-offset-4 hover:decoration-ring;
+  }
+
+  .empty-state {
+    @apply rounded-xl border border-dashed bg-background px-4 py-6 text-sm text-muted-foreground;
+  }
+
+  .brand-mark {
+    @apply relative grid size-9 shrink-0 place-items-center rounded-xl bg-primary;
+  }
+
+  .brand-box {
+    position: relative;
+    width: 15px;
+    height: 11px;
+    margin-top: 5px;
+    border: 1.5px solid currentColor;
+    border-radius: 1px;
+    background: linear-gradient(currentColor, currentColor) center / 1.5px 100%
+      no-repeat;
+  }
+
+  .brand-box::before,
+  .brand-box::after {
+    position: absolute;
+    top: -5px;
+    width: 7px;
+    height: 5px;
+    border: 1.5px solid currentColor;
+    content: '';
+  }
+
+  .brand-box::before {
+    left: 0;
+    border-radius: 4px 4px 0 4px;
+    transform: rotate(19deg);
+  }
+
+  .brand-box::after {
+    right: 0;
+    border-radius: 4px 4px 4px 0;
+    transform: rotate(-19deg);
   }
 }

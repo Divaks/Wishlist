@@ -3,6 +3,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm, type UseFormRegisterReturn } from 'react-hook-form'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { z } from 'zod'
+import giftBoxes from '@/assets/gift-boxes.webp'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -135,65 +136,74 @@ function AuthForm({ mode }: { mode: 'login' | 'register' }) {
   })
 
   return (
-    <Card className="mx-auto w-full max-w-md sm:mt-6">
-      <CardHeader>
-        <h1 className="text-2xl font-semibold tracking-tight">
-          {isRegister ? 'Create an account' : 'Log in'}
-        </h1>
-        {!isRegister && registeredEmail && (
-          <p role="status" className="text-sm text-muted-foreground">
-            Account created. Log in to continue.
-          </p>
-        )}
-      </CardHeader>
-      <CardContent>
-        <form noValidate onSubmit={submit}>
-          <fieldset disabled={isSubmitting} className="space-y-5">
-            {isRegister && (
+    <div className="mx-auto grid max-w-5xl overflow-hidden rounded-3xl border bg-card md:grid-cols-[0.85fr_1.15fr]">
+      <div className="relative hidden bg-secondary md:block">
+        <img
+          src={giftBoxes}
+          alt=""
+          className="absolute inset-0 size-full object-cover"
+        />
+      </div>
+      <Card className="gap-6 rounded-none border-0 px-2 py-8 shadow-none sm:p-9">
+        <CardHeader>
+          <h1 className="page-title">
+            {isRegister ? 'Create an account' : 'Log in'}
+          </h1>
+          {!isRegister && registeredEmail && (
+            <p role="status" className="text-sm text-muted-foreground">
+              Account created. Log in to continue.
+            </p>
+          )}
+        </CardHeader>
+        <CardContent>
+          <form noValidate onSubmit={submit}>
+            <fieldset disabled={isSubmitting} className="space-y-5">
+              {isRegister && (
+                <AuthField
+                  label="Name"
+                  autoComplete="name"
+                  field={register('name')}
+                  error={errors.name?.message}
+                />
+              )}
               <AuthField
-                label="Name"
-                autoComplete="name"
-                field={register('name')}
-                error={errors.name?.message}
+                label="Email"
+                type="email"
+                autoComplete="email"
+                required
+                field={register('email')}
+                error={errors.email?.message}
               />
-            )}
-            <AuthField
-              label="Email"
-              type="email"
-              autoComplete="email"
-              required
-              field={register('email')}
-              error={errors.email?.message}
-            />
-            <AuthField
-              label="Password"
-              type="password"
-              autoComplete={isRegister ? 'new-password' : 'current-password'}
-              required
-              field={register('password')}
-              error={errors.password?.message}
-            />
-            {errors.root && (
-              <p role="alert" className="text-sm text-destructive">
-                {errors.root.message}
-              </p>
-            )}
-            <Button type="submit" size="lg" className="w-full">
-              {isSubmitting ? submittingLabel : submitLabel}
-            </Button>
-          </fieldset>
-        </form>
-        <p className="mt-6 text-sm text-muted-foreground">
-          {isRegister ? 'Already have an account?' : 'New to Wishlist?'}{' '}
-          <Link
-            className="font-medium text-foreground underline underline-offset-4"
-            to={isRegister ? '/login' : '/register'}
-          >
-            {isRegister ? 'Log in' : 'Create an account'}
-          </Link>
-        </p>
-      </CardContent>
-    </Card>
+              <AuthField
+                label="Password"
+                type="password"
+                autoComplete={isRegister ? 'new-password' : 'current-password'}
+                required
+                field={register('password')}
+                error={errors.password?.message}
+              />
+              {errors.root && (
+                <p role="alert" className="text-sm text-destructive">
+                  {errors.root.message}
+                </p>
+              )}
+              <Button type="submit" size="lg" className="w-full">
+                {isSubmitting ? submittingLabel : submitLabel}
+              </Button>
+            </fieldset>
+          </form>
+          <p className="mt-6 text-sm text-muted-foreground">
+            {isRegister ? 'Already have an account?' : 'New to Wishlist?'}{' '}
+            <Link
+              className="text-link"
+              to={isRegister ? '/login' : '/register'}
+            >
+              {isRegister ? 'Log in' : 'Create an account'}
+            </Link>
+          </p>
+        </CardContent>
+      </Card>
+    </div>
   )
 }
 

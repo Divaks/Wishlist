@@ -79,7 +79,7 @@ export function WishForm({
           <select
             id="wish-priority"
             {...register('priority')}
-            className="rounded border p-1"
+            className="rounded-md border border-input bg-card px-3 py-2 text-sm"
           >
             <option value="low">Low</option>
             <option value="medium">Medium</option>

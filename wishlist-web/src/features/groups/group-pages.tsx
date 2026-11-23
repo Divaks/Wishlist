@@ -24,80 +24,97 @@ export function GroupsPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-xl font-semibold">Groups</h1>
-      <section className="space-y-3">
-        <h2 className="font-semibold">New group</h2>
-        <GroupForm
-          disabled={create.isPending}
-          onSave={(json) =>
-            create.mutate(async () => {
-              const group = await api<Group>('/groups', {
-                method: 'POST',
-                json,
-              })
-              void navigate(`/groups/${group.id}`)
-            })
-          }
-        />
-        <ActionFeedback action={create} />
-      </section>
-      <section className="space-y-3">
-        <h2 className="font-semibold">Invitations</h2>
-        <QueryContent query={invitations}>
-          {(items) =>
-            items.length ? (
-              <ul className="space-y-2">
-                {items.map(({ groupId }) => (
-                  <li
-                    key={groupId}
-                    className="flex flex-wrap items-center gap-2"
-                  >
-                    <span>Group {groupId}</span>
-                    <Button
-                      variant="outline"
-                      disabled={accept.isPending}
-                      onClick={() =>
-                        accept.mutate(async () => {
-                          await api<void>(
-                            `/groups/${groupId}/invitations/accept`,
-                            { method: 'POST' },
-                          )
-                          void navigate(`/groups/${groupId}`)
-                        })
-                      }
-                    >
-                      Accept invitation
-                    </Button>
+      <h1 className="page-title">Groups</h1>
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+        <section className="space-y-3">
+          <h2 className="section-title">My groups</h2>
+          <ApiList<Group>
+            path="/groups"
+            pagedPath="/groups/paged"
+            empty="No groups yet."
+          >
+            {(items) => (
+              <ul className="card-grid">
+                {items.map((group) => (
+                  <li key={group.id} className="item-card">
+                    <h3 className="font-display text-2xl leading-tight font-medium">
+                      <Link className="text-link" to={group.id}>
+                        {group.name}
+                      </Link>
+                    </h3>
+                    {group.description && (
+                      <p className="text-sm text-muted-foreground">
+                        {group.description}
+                      </p>
+                    )}
+                    <span className="tag">
+                      {group.members.length}{' '}
+                      {group.members.length === 1 ? 'member' : 'members'}
+                    </span>
                   </li>
                 ))}
               </ul>
-            ) : (
-              <p>No pending invitations.</p>
-            )
-          }
-        </QueryContent>
-        <ActionFeedback action={accept} />
-      </section>
-      <section className="space-y-3">
-        <h2 className="font-semibold">My groups</h2>
-        <ApiList<Group>
-          path="/groups"
-          pagedPath="/groups/paged"
-          empty="No groups yet."
-        >
-          {(items) => (
-            <ul className="space-y-2">
-              {items.map((group) => (
-                <li key={group.id}>
-                  <Link className="underline" to={group.id}>
-                    {group.name}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </ApiList>
-      </section>
+            )}
+          </ApiList>
+        </section>
+        <div className="space-y-5">
+          <section className="panel">
+            <h2 className="section-title">New group</h2>
+            <GroupForm
+              disabled={create.isPending}
+              onSave={(json) =>
+                create.mutate(async () => {
+                  const group = await api<Group>('/groups', {
+                    method: 'POST',
+                    json,
+                  })
+                  void navigate(`/groups/${group.id}`)
+                })
+              }
+            />
+            <ActionFeedback action={create} />
+          </section>
+          <section className="panel">
+            <h2 className="section-title">Invitations</h2>
+            <QueryContent query={invitations}>
+              {(items) =>
+                items.length ? (
+                  <ul className="space-y-2">
+                    {items.map(({ groupId }) => (
+                      <li
+                        key={groupId}
+                        className="flex flex-wrap items-center gap-2 rounded-xl bg-background p-3"
+                      >
+                        <span className="min-w-0 text-sm wrap-break-word">
+                          Group {groupId}
+                        </span>
+                        <Button
+                          variant="outline"
+                          disabled={accept.isPending}
+                          onClick={() =>
+                            accept.mutate(async () => {
+                              await api<void>(
+                                `/groups/${groupId}/invitations/accept`,
+                                { method: 'POST' },
+                              )
+                              void navigate(`/groups/${groupId}`)
+                            })
+                          }
+                        >
+                          Accept invitation
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="empty-state">No pending invitations.</p>
+                )
+              }
+            </QueryContent>
+            <ActionFeedback action={accept} />
+          </section>
+        </div>
+      </div>
     </div>
   )
 }
@@ -120,91 +137,107 @@ function GroupDetails({ group, userId }: { group: Group; userId: string }) {
 
   return (
     <>
-      <h1 className="text-xl font-semibold">{group.name}</h1>
-      {group.description && <p>{group.description}</p>}
-      {isOwner && (
-        <section className="space-y-3">
-          <h2 className="font-semibold">Edit group</h2>
-          <GroupForm
-            group={group}
-            disabled={action.isPending}
-            onSave={(json) =>
-              action.mutate(() => api<Group>(path, { method: 'PATCH', json }))
-            }
-          />
-        </section>
+      <h1 className="page-title">{group.name}</h1>
+      {group.description && (
+        <p className="text-muted-foreground wrap-break-word">
+          {group.description}
+        </p>
       )}
-      <section className="space-y-3">
-        <h2 className="font-semibold">Members</h2>
-        <ul className="space-y-3">
-          {group.members.map((member) => (
-            <li key={member.id} className="flex flex-wrap items-center gap-2">
-              <span>
-                {member.user.name || member.user.email} ({member.role})
-              </span>
-              {isOwner && member.userId !== userId && (
-                <>
-                  <Button
-                    variant="outline"
-                    disabled={action.isPending}
-                    onClick={() => {
-                      if (
-                        window.confirm(
-                          'Transfer group ownership to this member?',
-                        )
-                      )
-                        action.mutate(() =>
-                          api<void>(
-                            `${path}/members/${member.userId}/transfer-ownership`,
-                            { method: 'POST' },
-                          ),
-                        )
-                    }}
-                  >
-                    Transfer ownership
-                  </Button>
-                  <Button
-                    variant="outline"
-                    disabled={action.isPending}
-                    onClick={() => {
-                      if (window.confirm('Remove this member?'))
-                        action.mutate(() =>
-                          api<void>(`${path}/members/${member.userId}`, {
-                            method: 'DELETE',
-                          }),
-                        )
-                    }}
-                  >
-                    Remove member
-                  </Button>
-                </>
-              )}
-            </li>
-          ))}
-        </ul>
-        {isOwner && (
-          <InviteForm
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+        <GroupWishes group={group} userId={userId} />
+        <div className="min-w-0 space-y-5">
+          {isOwner && (
+            <section className="panel">
+              <h2 className="section-title">Edit group</h2>
+              <GroupForm
+                group={group}
+                disabled={action.isPending}
+                onSave={(json) =>
+                  action.mutate(() =>
+                    api<Group>(path, { method: 'PATCH', json }),
+                  )
+                }
+              />
+            </section>
+          )}
+          <section className="panel">
+            <h2 className="section-title">Members</h2>
+            <ul className="space-y-3">
+              {group.members.map((member) => (
+                <li
+                  key={member.id}
+                  className="flex flex-wrap items-center gap-2"
+                >
+                  <span className="tag">
+                    {member.user.name || member.user.email}
+                  </span>
+                  <span className="text-xs capitalize text-muted-foreground">
+                    {member.role}
+                  </span>
+                  {isOwner && member.userId !== userId && (
+                    <>
+                      <Button
+                        variant="outline"
+                        disabled={action.isPending}
+                        onClick={() => {
+                          if (
+                            window.confirm(
+                              'Transfer group ownership to this member?',
+                            )
+                          )
+                            action.mutate(() =>
+                              api<void>(
+                                `${path}/members/${member.userId}/transfer-ownership`,
+                                { method: 'POST' },
+                              ),
+                            )
+                        }}
+                      >
+                        Transfer ownership
+                      </Button>
+                      <Button
+                        variant="outline"
+                        disabled={action.isPending}
+                        onClick={() => {
+                          if (window.confirm('Remove this member?'))
+                            action.mutate(() =>
+                              api<void>(`${path}/members/${member.userId}`, {
+                                method: 'DELETE',
+                              }),
+                            )
+                        }}
+                      >
+                        Remove member
+                      </Button>
+                    </>
+                  )}
+                </li>
+              ))}
+            </ul>
+            {isOwner && (
+              <InviteForm
+                disabled={action.isPending}
+                onInvite={(json) =>
+                  action.mutate(() =>
+                    api<InviteMemberResponse>(`${path}/members`, {
+                      method: 'POST',
+                      json,
+                    }),
+                  )
+                }
+              />
+            )}
+          </section>
+          <Button
+            variant={isOwner ? 'destructive' : 'outline'}
             disabled={action.isPending}
-            onInvite={(json) =>
-              action.mutate(() =>
-                api<InviteMemberResponse>(`${path}/members`, {
-                  method: 'POST',
-                  json,
-                }),
-              )
-            }
-          />
-        )}
-      </section>
-      <Button
-        variant={isOwner ? 'destructive' : 'outline'}
-        disabled={action.isPending}
-        onClick={exitGroup}
-      >
-        {isOwner ? 'Delete group' : 'Leave group'}
-      </Button>
-      <ActionFeedback action={action} />
-      <GroupWishes group={group} userId={userId} />
+            onClick={exitGroup}
+          >
+            {isOwner ? 'Delete group' : 'Leave group'}
+          </Button>
+          <ActionFeedback action={action} />
+        </div>
+      </div>
     </>
   )
 }
@@ -218,7 +251,7 @@ export function GroupPage() {
 
   return (
     <div className="space-y-5">
-      <Link className="underline" to="/groups">
+      <Link className="text-link text-sm" to="/groups">
         Back to groups
       </Link>
       <QueryContent query={group}>

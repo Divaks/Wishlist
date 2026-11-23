@@ -48,8 +48,10 @@ function ProfileForm({ profile }: { profile: ProfileResponse }) {
   }
 
   return (
-    <div className="space-y-4">
-      <p>Email: {profile.email}</p>
+    <div className="panel">
+      <p className="text-sm text-muted-foreground wrap-break-word">
+        {profile.email}
+      </p>
       <form onSubmit={save}>
         <fieldset disabled={action.isPending} className="grid gap-3">
           <label>
@@ -66,6 +68,7 @@ function ProfileForm({ profile }: { profile: ProfileResponse }) {
           </Button>
         </fieldset>
       </form>
+      <hr className="my-5 border-border" />
       <Button
         type="button"
         variant="destructive"
@@ -82,8 +85,8 @@ function ProfileForm({ profile }: { profile: ProfileResponse }) {
 export function ProfilePage() {
   const profile = useApiQuery<ProfileResponse>('/users/profile')
   return (
-    <div className="space-y-4">
-      <h1 className="text-xl font-semibold">Profile</h1>
+    <div className="mx-auto max-w-2xl space-y-5">
+      <h1 className="page-title">Profile</h1>
       <QueryContent query={profile}>
         {(data) => <ProfileForm key={data.userId} profile={data} />}
       </QueryContent>

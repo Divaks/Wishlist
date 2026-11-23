@@ -25,13 +25,13 @@ export function GroupWishes({
   const path = `/groups/${group.id}/wishes` as const
 
   return (
-    <section className="space-y-3">
-      <h2 className="font-semibold">Group wishes</h2>
+    <section className="min-w-0 space-y-4">
+      <h2 className="section-title">Group wishes</h2>
       <div className="flex flex-wrap items-center gap-2">
         <label htmlFor="wishlist-owner">Wishlist owner</label>
         <select
           id="wishlist-owner"
-          className="rounded border p-1"
+          className="max-w-full rounded-md border border-input bg-card px-3 py-2 text-sm"
           value={memberId}
           onChange={(event) => setSelectedMember(event.target.value)}
         >
@@ -50,11 +50,11 @@ export function GroupWishes({
         empty="No wishes here yet."
       >
         {(items) => (
-          <ul className="space-y-3">
+          <ul className="card-grid">
             {items.map((wish) => (
-              <li key={wish.id} className="space-y-2 rounded border p-3">
+              <li key={wish.id} className="item-card">
                 <WishSummary wish={wish} />
-                <p>
+                <p className="tag">
                   Wish by{' '}
                   {wish.user?.name ||
                     group.members.find(
@@ -63,9 +63,9 @@ export function GroupWishes({
                     'a member'}
                 </p>
                 {wish.userId !== userId && (
-                  <div className="space-y-1">
+                  <div className="flex flex-wrap items-center gap-2 border-t pt-3">
                     {wish.isReserved && (
-                      <p>
+                      <p className="tag tag-reserved">
                         {wish.reservedById === userId
                           ? 'Reserved by you'
                           : 'Reserved'}
@@ -73,7 +73,7 @@ export function GroupWishes({
                     )}
                     {(!wish.isReserved || wish.reservedById === userId) && (
                       <Button
-                        variant="outline"
+                        variant={wish.isReserved ? 'outline' : 'default'}
                         disabled={action.isPending}
                         onClick={() =>
                           action.mutate(() =>
