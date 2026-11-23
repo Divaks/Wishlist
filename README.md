@@ -1,10 +1,69 @@
-# Wishlist API
+# Wishlist
+
+Вебзастосунок для спільних списків бажань. Учасники створюють групи, запрошують друзів за email, переглядають їхні списки та бронюють подарунки.
+
+## Структура репозиторію
+
+| Шлях | Призначення |
+|---|---|
+| `couple-wishlist-api/` | NestJS 11, TypeORM, PostgreSQL 16, JWT, тести Jest і міграції |
+| [`wishlist-web/`](wishlist-web/README.md) | React 19, TypeScript, Vite, Tailwind CSS, Vitest і MSW |
+| `docker-compose.yml` | Локальний PostgreSQL 16 |
+| `.github/workflows/ci.yml` | Окремі завдання CI для API та вебзастосунку |
+| [`AGENTS.md`](AGENTS.md) | Правила роботи з репозиторієм і поточна архітектура |
 
 ## Локальний запуск
 
-Потрібні PostgreSQL 16 та Node.js 24 LTS. Скопіюйте кореневий `.env.example` у `.env`, задайте пароль БД і встановіть `JWT_SECRET` зі значення `openssl rand -hex 32`. Запустіть `docker compose up -d postgres`. У `couple-wishlist-api/` виконайте `npm ci`, `npm run build` і `npm run start:prod`. Змінні процесу мають пріоритет над файлами середовища.
+Потрібні npm, OpenSSL для генерації секрету та Docker із Compose для локального PostgreSQL. CI використовує Node.js 24 для API і Node.js 22 для фронтенду. Для обох застосунків локально можна використовувати актуальний Node.js 22 LTS (від 22.22.2). Встановлюйте залежності окремо через `npm ci` у каталогах застосунків.
 
-## Перехід із main
+### 1. Налаштуйте PostgreSQL та API
+
+У корені репозиторію:
+
+```bash
+cp .env.example .env
+openssl rand -hex 32
+```
+
+Запишіть згенероване значення в `JWT_SECRET` у кореневому `.env`. Для типового запуску залиште `PORT=3000`, `DB_HOST=localhost` і `DB_PORT=5432`. Встановіть локальний пароль у `DB_PASSWORD`. Compose використовує `DB_USERNAME`, `DB_PASSWORD` і `DB_NAME` під час першої ініціалізації тому. Для наявного тому використовуйте його поточні облікові дані й назву БД.
+
+```bash
+docker compose up -d postgres
+docker compose exec postgres pg_isready
+cd couple-wishlist-api
+npm ci
+npm run start:dev
+```
+
+Під час старту TypeORM застосовує міграції. Змінні процесу мають пріоритет над файлами конфігурації. Для запуску зібраного API використовуйте `npm run build` і `npm run start:prod`.
+
+### 2. Запустіть фронтенд
+
+У другому терміналі від кореня репозиторію:
+
+```bash
+cd wishlist-web
+nvm install
+nvm use
+npm ci
+cp .env.example .env.local
+npm run dev
+```
+
+Команди `nvm` потрібні, якщо ви використовуєте цей менеджер версій Node. Відкрийте `http://localhost:5173`. Vite перенаправляє `/api/*` на `http://localhost:3000` і прибирає префікс `/api`. Тому за стандартної конфігурації браузер працює через той самий origin і зміна `CORS_ORIGIN` не потрібна.
+
+### 3. Перевірте з’єднання
+
+```bash
+curl --fail http://localhost:3000/health
+curl --fail http://localhost:5173/api/health
+```
+
+Обидва запити мають повернути JSON зі `status: "ok"`. Те саме можна перевірити на сторінці **API connection**. Якщо API слухає інший порт, синхронізуйте ціль проксі у `wishlist-web/vite.config.ts` або задайте абсолютний `VITE_API_URL` і дозвольте origin фронтенду через `CORS_ORIGIN`.
+
+Після реєстрації увійдіть з тим самим email. Щоб перевірити запрошення й бронювання, виконайте сценарій із двома акаунтами в окремих сесіях браузера. [Сценарій перевірки](wishlist-web/README.md#check-the-frontend-against-the-backend)
+
+## Міграція зі старої партнерської схеми
 
 Перед оновленням збережіть резервну копію та явно задайте `DB_NAME` поточної БД. Запустіть один екземпляр API для застосування транзакційної міграції, потім решту. Для відкату відновіть резервну копію разом із попередньою версією застосунку. Якщо наявні email збігаються після приведення до нижнього регістру, міграція зупиниться. Визначте власників конфліктних записів до повторного запуску.
 
@@ -22,6 +81,8 @@
 Під час бронювання лише один конкурентний запит отримує 201. Решта отримують 409. Власник бажання не бачить броні. Інші учасники бачать стан, а особу того, хто забронював, API показує лише йому самому.
 
 ## Перевірки
+
+Фронтенд запускає `npm run typecheck`, `npm run lint`, `npm test` і `npm run build` у `wishlist-web/`. Vitest використовує MSW для HTTP-запитів. Щоб перевірити форматування, запустіть `npm run format:check`.
 
 У каталозі API виконайте `npm run lint`, `npm test -- --runInBand --coverage`, `npm run build` і `npm run test:e2e -- --runInBand`. Для E2E задайте змінні підключення PostgreSQL у середовищі процесу. Використовуйте тестовий сервер і роль із правом CREATEDB. Набір створює й видаляє окрему БД з випадковим ім’ям.
 

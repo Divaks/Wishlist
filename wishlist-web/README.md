@@ -5,7 +5,7 @@ React frontend for Wishlist with account, group, and wish management.
 ## Prerequisites
 
 - A current Node.js 22 LTS release (22.22.2 or newer for the test runner) and npm.
-- For live API requests, run the NestJS backend separately on port 3000. Its setup is documented in the [repository README](../README.md).
+- For live API requests, run the NestJS backend separately on port 3000. Its setup is documented in the [repository setup guide](../README.md#локальний-запуск).
 
 ## Local development
 
@@ -13,13 +13,14 @@ From the repository root:
 
 ```sh
 cd wishlist-web
+nvm install
 nvm use
 npm ci
 cp .env.example .env.local
 npm run dev
 ```
 
-Open http://localhost:5173. During development, Vite proxies `/api` to `http://localhost:3000` and strips the prefix. For example, `/api/auth/login` reaches NestJS at `/auth/login`.
+Open http://localhost:5173 and select **API connection**, or run `curl --fail http://localhost:5173/api/health` to check the proxy. During development, Vite proxies `/api` to `http://localhost:3000` and strips the prefix. For example, `/api/auth/login` reaches NestJS at `/auth/login`.
 
 ### Environment
 
@@ -56,7 +57,13 @@ Vite exposes `VITE_*` variables to browser code. For deployment, configure the h
 | `src/types/`      | Request and response types based on the current NestJS implementation. |
 | `src/test/`       | Vitest setup, MSW handlers and tests.                                  |
 
-Tailwind CSS is configured in `src/index.css`. The shadcn/ui configuration lives in `components.json`, with Button, Input, Card and Label source in `src/components/ui/`.
+The shared color tokens and DM Sans and Fraunces typography are configured in `src/index.css`. The gift image lives in `src/assets/`, and the font license notices live in `public/font-licenses/`. The shadcn/ui configuration lives in `components.json`, with Button, Input, Card and Label source in `src/components/ui/`.
+
+## Routes
+
+- Public routes are `/`, `/login`, `/register`, and `/connection`.
+- Sign in to access `/profile`, `/groups`, `/groups/:groupId`, `/wishlist`, and `/wishlist/:wishId`.
+- The frontend attaches the bearer token to API requests. NestJS enforces group membership, ownership, and reservation rules.
 
 ## Current API behavior
 
