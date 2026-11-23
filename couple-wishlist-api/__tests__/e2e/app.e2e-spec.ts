@@ -1,367 +1,223 @@
-import { Test } from "@nestjs/testing";
-import { INestApplication, ValidationPipe } from "@nestjs/common";
-import { ConfigModule } from "@nestjs/config";
-import { JwtModule } from "@nestjs/jwt";
-import { PassportModule } from "@nestjs/passport";
-import { getRepositoryToken } from "@nestjs/typeorm";
-import { QueryFailedError } from "typeorm";
+import { INestApplication } from "@nestjs/common";
+import { NestFactory } from "@nestjs/core";
+import { randomUUID } from "node:crypto";
+import { DataSource } from "typeorm";
 import request from "supertest";
-import { App } from "supertest/types";
-import { AuthController } from "../../src/controllers/auth.controller";
-import { UsersController } from "../../src/controllers/users.controller";
-import { WishlistController } from "../../src/controllers/wishlist.controller";
-import { AuthService } from "../../src/services/auth.service";
-import { UsersService } from "../../src/services/users.service";
-import { WishlistService } from "../../src/services/wishlist.service";
-import { JwtStrategy } from "../../src/strategies/jwt.strategy";
-import { User } from "../../src/models/user.model";
-import { WishItem } from "../../src/models/wish-item.model";
+import { WishlistSchema1795300000000 } from "../../src/migrations/1795300000000-wishlist-schema";
+import { configureApp } from "../../src/configure-app";
 
-/**
- * HTTP-level tests: real controllers, services, guard, JWT strategy and
- * ValidationPipe; only the TypeORM repositories are replaced by in-memory fakes,
- * so no database is needed.
- */
-describe("Wishlist API (e2e, in-memory repositories)", () => {
-  let app: INestApplication<App>;
-  let users: any[];
-  let wishes: any[];
-
-  beforeEach(async () => {
-    users = [];
-    wishes = [];
-    let seq = 0;
-
-    const userRepo = {
-      create: (x: object) => ({ id: `u${++seq}`, ...x }),
-      save: (x: any) => {
-        if (users.some((u) => u.email === x.email)) {
-          return Promise.reject(
-            new QueryFailedError("INSERT", [], { code: "23505" } as any),
-          );
-        }
-        users.push(x);
-        return Promise.resolve(x);
-      },
-      findOne: ({ where }: any) =>
-        Promise.resolve(
-          users.find((u) =>
-            Object.entries(where).every(([k, v]) => u[k] === v),
-          ) ?? null,
-        ),
-      update: (id: string, patch: object) => {
-        Object.assign(
-          users.find((u) => u.id === id),
-          patch,
-        );
-        return Promise.resolve();
-      },
-      find: () => Promise.resolve(users),
-    };
-    const wishRepo = {
-      create: (x: object) => ({ id: `w${++seq}`, ...x }),
-      save: (x: any) => {
-        if (!wishes.includes(x)) wishes.push(x);
-        return Promise.resolve(x);
-      },
-      find: ({ where }: any) =>
-        Promise.resolve(wishes.filter((w) => w.userId === where.userId)),
-      findOne: ({ where }: any) =>
-        Promise.resolve(
-          wishes.find((w) =>
-            Object.entries(where).every(([k, v]) => w[k] === v),
-          ) ?? null,
-        ),
-      remove: (x: any) => {
-        wishes = wishes.filter((w) => w !== x);
-        return Promise.resolve(x);
-      },
-    };
-
-    const moduleRef = await Test.createTestingModule({
-      imports: [
-        ConfigModule.forRoot({
-          isGlobal: true,
-          ignoreEnvFile: true,
-          load: [() => ({ JWT_SECRET: "e2e-secret" })],
-        }),
-        PassportModule,
-        JwtModule.register({
-          secret: "e2e-secret",
-          signOptions: { expiresIn: "1d" },
-        }),
-      ],
-      controllers: [AuthController, UsersController, WishlistController],
-      providers: [
-        AuthService,
-        UsersService,
-        WishlistService,
-        JwtStrategy,
-        { provide: getRepositoryToken(User), useValue: userRepo },
-        { provide: getRepositoryToken(WishItem), useValue: wishRepo },
-      ],
-    }).compile();
-
-    app = moduleRef.createNestApplication();
-    app.useGlobalPipes(new ValidationPipe());
+describe("PostgreSQL wishlist API", () => {
+  const database = "wishlist_e2e_" + randomUUID().replaceAll("-", "");
+  let admin: DataSource;
+  let app: INestApplication;
+  let created = false;
+  beforeAll(async () => {
+    admin = await new DataSource({
+      type: "postgres",
+      host: process.env.DB_HOST ?? "localhost",
+      port: Number(process.env.DB_PORT ?? 5432),
+      username: process.env.DB_USERNAME ?? "postgres",
+      password: process.env.DB_PASSWORD,
+      database: "postgres",
+    }).initialize();
+    await admin.query('CREATE DATABASE "' + database + '"');
+    created = true;
+    process.env.DB_NAME = database;
+    process.env.JWT_SECRET = randomUUID();
+    const { AppModule } = await import("../../src/app.module");
+    app = await NestFactory.create(AppModule, {
+      logger: false,
+      abortOnError: false,
+    });
+    configureApp(app);
     await app.init();
+  }, 30000);
+  afterAll(async () => {
+    await app?.close();
+    if (created) await admin.query('DROP DATABASE "' + database + '"');
+    if (admin?.isInitialized) await admin.destroy();
   });
 
-  afterEach(() => app.close());
-
-  const register = (email: string, password = "secret1") =>
-    request(app.getHttpServer())
+  const api = () => request(app.getHttpServer());
+  async function account() {
+    const email = randomUUID() + "@example.org";
+    const credentials = { email, password: "long-passphrase" };
+    const registration = await api()
       .post("/auth/register")
-      .send({ email, password, name: email.split("@")[0] });
-
-  const login = async (email: string, password = "secret1") => {
-    const res = await request(app.getHttpServer())
+      .send(credentials)
+      .expect(201);
+    expect(registration.body.password).toBeUndefined();
+    const login = await api().post("/auth/login").send(credentials).expect(201);
+    return {
+      email,
+      id: registration.body.id as string,
+      auth: { Authorization: "Bearer " + login.body.accessToken },
+    };
+  }
+  it("preserves legacy IDs, email identities, partnerships and reservations during upgrade", async () => {
+    const runner = app.get(DataSource).createQueryRunner();
+    await runner.connect();
+    await runner.startTransaction();
+    try {
+      await runner.query(`
+        CREATE SCHEMA legacy_fixture;
+        SET LOCAL search_path TO legacy_fixture;
+        CREATE TABLE "user" (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), email varchar UNIQUE NOT NULL, password varchar NOT NULL, name varchar, "partnerId" uuid UNIQUE REFERENCES "user"(id));
+        INSERT INTO "user"(email,password) VALUES ('Legacy@example.org','fixture'),('partner@example.org','fixture');
+        UPDATE "user" a SET "partnerId"=b.id FROM "user" b WHERE a.id<>b.id;
+        CREATE TABLE wish_item (id serial PRIMARY KEY,title varchar NOT NULL,"userId" uuid REFERENCES "user"(id),"reservedById" uuid REFERENCES "user"(id));
+        INSERT INTO wish_item(title,"userId","reservedById") SELECT 'Keepsake',id,"partnerId" FROM "user" WHERE email='Legacy@example.org';
+      `);
+      await new WishlistSchema1795300000000().up(runner);
+      const rows = await runner.query(
+        `SELECT w.id, u.email, b.email AS reserver FROM wish_item w JOIN "user" u ON w."userId"=u.id JOIN "user" b ON w."reservedById"=b.id`,
+      );
+      expect(rows).toEqual([
+        {
+          id: "00000000-0000-4000-8000-000000000001",
+          email: "legacy@example.org",
+          reserver: "partner@example.org",
+        },
+      ]);
+      const members = await runner.query(
+        "SELECT role FROM group_member ORDER BY role::text",
+      );
+      expect(members).toEqual([{ role: "member" }, { role: "owner" }]);
+    } finally {
+      await runner.rollbackTransaction();
+      await runner.release();
+    }
+  });
+  it("validates credentials and rejects unauthenticated access", async () => {
+    await api().get("/groups").expect(401);
+    await api()
+      .post("/auth/register")
+      .send({ email: "invalid", password: "short" })
+      .expect(400);
+    await api()
       .post("/auth/login")
-      .send({ email, password });
-    return res.body.accessToken as string;
-  };
-
-  const signedIn = async (email: string) => {
-    await register(email).expect(201);
-    return login(email);
-  };
-
-  describe("auth", () => {
-    it("registers, stores a bcrypt hash and logs in", async () => {
-      const reg = await register("ann@x.com").expect(201);
-      expect(reg.body).toEqual({
-        id: expect.any(String),
-        email: "ann@x.com",
-        name: "ann",
-      });
-      expect(users[0].password).not.toBe("secret1");
-      expect(users[0].name).toBe("ann");
-
-      const res = await request(app.getHttpServer())
-        .post("/auth/login")
-        .send({ email: "ann@x.com", password: "secret1" })
-        .expect(201);
-      expect(res.body.accessToken).toEqual(expect.any(String));
-    });
-
-    it("returns 409 when the email is already registered", async () => {
-      await register("ann@x.com").expect(201);
-      await register("ann@x.com").expect(409);
-    });
-
-    it("rejects a wrong password with 401", async () => {
-      await register("ann@x.com");
-      await request(app.getHttpServer())
-        .post("/auth/login")
-        .send({ email: "ann@x.com", password: "wrong-pass" })
-        .expect(401);
-    });
-
-    it("rejects an unknown user with 401", async () => {
-      await request(app.getHttpServer())
-        .post("/auth/login")
-        .send({ email: "ghost@x.com", password: "secret1" })
-        .expect(401);
-    });
-
-    it("validates the register payload (400)", async () => {
-      await request(app.getHttpServer())
-        .post("/auth/register")
-        .send({ email: "not-an-email", password: "123" })
-        .expect(400);
-    });
-
-    it("validates the login payload (400)", async () => {
-      await request(app.getHttpServer())
-        .post("/auth/login")
-        .send({})
-        .expect(400);
-    });
+      .send({ email: "missing@example.org", password: "wrong" })
+      .expect(401);
+    const user = await account();
+    await api()
+      .post("/auth/register")
+      .send({ email: user.email, password: "long-passphrase" })
+      .expect(409);
+    await api()
+      .patch("/users/profile")
+      .set(user.auth)
+      .send({ birthday: "2024-02-30" })
+      .expect(400);
+    await api()
+      .patch("/users/profile")
+      .set(user.auth)
+      .send({ birthday: "2000-01-02" })
+      .expect(200);
+    const profile = await api()
+      .get("/users/profile")
+      .set(user.auth)
+      .expect(200);
+    expect(profile.body.birthday).toBe("2000-01-02");
+    await api().delete("/users/account").set(user.auth).expect(204);
+    await api().get("/users/profile").set(user.auth).expect(401);
   });
-
-  describe("protected routes", () => {
-    it.each([
-      ["get", "/users/profile"],
-      ["post", "/users/generate-code"],
-      ["get", "/wishlist"],
-      ["post", "/wishlist"],
-    ])("%s %s returns 401 without a token", async (method, url) => {
-      await (request(app.getHttpServer()) as any)[method](url).expect(401);
+  it("requires acceptance and persists exactly one concurrent reservation", async () => {
+    const owner = await account(),
+      a = await account(),
+      b = await account();
+    const group = await api()
+      .post("/groups")
+      .set(owner.auth)
+      .send({ name: "Family" })
+      .expect(201);
+    const path = "/groups/" + group.body.id;
+    const wish = await api()
+      .post("/wishlist")
+      .set(owner.auth)
+      .send({ title: "Tea", isInCart: true })
+      .expect(201);
+    expect(wish.body.isInCart).toBe(true);
+    const item = "/wishlist/" + wish.body.id;
+    const legacyList = await api().get("/wishlist").set(owner.auth).expect(200);
+    expect(legacyList.body.map((w: { id: string }) => w.id)).toContain(
+      wish.body.id,
+    );
+    const paged = await api()
+      .get("/wishlist/paged?page=1&limit=1")
+      .set(owner.auth)
+      .expect(200);
+    expect(paged.body).toMatchObject({ total: 1, limit: 1, page: 1 });
+    await api()
+      .patch(item)
+      .set(owner.auth)
+      .send({ isInCart: null })
+      .expect(400);
+    const changed = await api()
+      .patch(item)
+      .set(owner.auth)
+      .send({ price: 14.25 })
+      .expect(200);
+    expect(changed.body).toMatchObject({
+      price: 14.25,
+      user: { id: owner.id },
     });
-
-    it("returns 401 for a garbage token", async () => {
-      await request(app.getHttpServer())
-        .get("/users/profile")
-        .set("Authorization", "Bearer not.a.jwt")
-        .expect(401);
-    });
-  });
-
-  describe("users", () => {
-    it("returns the profile from the token", async () => {
-      const token = await signedIn("ann@x.com");
-      const res = await request(app.getHttpServer())
-        .get("/users/profile")
-        .set("Authorization", `Bearer ${token}`)
-        .expect(200);
-      expect(res.body).toMatchObject({ email: "ann@x.com" });
-    });
-
-    it("connects two users through an invite code", async () => {
-      const annToken = await signedIn("ann@x.com");
-      const bobToken = await signedIn("bob@x.com");
-
-      const { body } = await request(app.getHttpServer())
-        .post("/users/generate-code")
-        .set("Authorization", `Bearer ${annToken}`)
+    for (const member of [a, b]) {
+      await api()
+        .post(path + "/members")
+        .set(owner.auth)
+        .send({ email: member.email })
         .expect(201);
-
-      await request(app.getHttpServer())
-        .post("/users/connect")
-        .set("Authorization", `Bearer ${bobToken}`)
-        .send({ code: body.inviteCode })
-        .expect(201);
-
-      expect(users[0].partnerId).toBe(users[1].id);
-      expect(users[1].partnerId).toBe(users[0].id);
-    });
-
-    it("returns 404 for an invalid code and 400 for your own code", async () => {
-      const token = await signedIn("ann@x.com");
-      await request(app.getHttpServer())
-        .post("/users/connect")
-        .set("Authorization", `Bearer ${token}`)
-        .send({ code: "NOPE" })
+      await api()
+        .get(path + "/wishes/paged")
+        .set(member.auth)
+        .expect(403);
+      await api()
+        .post(item + "/reserve")
+        .set(member.auth)
         .expect(404);
-
-      const { body } = await request(app.getHttpServer())
-        .post("/users/generate-code")
-        .set("Authorization", `Bearer ${token}`);
-      await request(app.getHttpServer())
-        .post("/users/connect")
-        .set("Authorization", `Bearer ${token}`)
-        .send({ code: body.inviteCode })
-        .expect(400);
-    });
-  });
-
-  describe("wishlist", () => {
-    it("creates, lists, updates and deletes own wishes", async () => {
-      const token = await signedIn("ann@x.com");
-      const auth = { Authorization: `Bearer ${token}` };
-
-      const created = await request(app.getHttpServer())
-        .post("/wishlist")
-        .set(auth)
-        .send({ title: "Camera", price: 250, link: "https://x.com/c" })
-        .expect(201);
-      expect(created.body).toMatchObject({
-        title: "Camera",
-        link: "https://x.com/c",
-        userId: users[0].id,
-      });
-
-      const list = await request(app.getHttpServer())
-        .get("/wishlist")
-        .set(auth)
-        .expect(200);
-      expect(list.body).toHaveLength(1);
-
-      const updated = await request(app.getHttpServer())
-        .patch(`/wishlist/${created.body.id}`)
-        .set(auth)
-        .send({ title: "Better camera" })
-        .expect(200);
-      expect(updated.body.title).toBe("Better camera");
-
-      await request(app.getHttpServer())
-        .delete(`/wishlist/${created.body.id}`)
-        .set(auth)
-        .expect(200);
-      expect(wishes).toHaveLength(0);
-    });
-
-    it("validates the create payload (400)", async () => {
-      const token = await signedIn("ann@x.com");
-      await request(app.getHttpServer())
-        .post("/wishlist")
-        .set("Authorization", `Bearer ${token}`)
-        .send({ title: "", price: "free" })
-        .expect(400);
-    });
-
-    it("404s when touching someone else's wish", async () => {
-      const annToken = await signedIn("ann@x.com");
-      const bobToken = await signedIn("bob@x.com");
-      const { body } = await request(app.getHttpServer())
-        .post("/wishlist")
-        .set("Authorization", `Bearer ${annToken}`)
-        .send({ title: "Secret" });
-
-      await request(app.getHttpServer())
-        .delete(`/wishlist/${body.id}`)
-        .set("Authorization", `Bearer ${bobToken}`)
-        .expect(404);
-      await request(app.getHttpServer())
-        .patch(`/wishlist/${body.id}`)
-        .set("Authorization", `Bearer ${bobToken}`)
-        .send({ title: "hacked" })
-        .expect(404);
-    });
-
-    it("lets a partner view and reserve a wish, but not their own", async () => {
-      const annToken = await signedIn("ann@x.com");
-      const bobToken = await signedIn("bob@x.com");
-      const ann = { Authorization: `Bearer ${annToken}` };
-      const bob = { Authorization: `Bearer ${bobToken}` };
-
-      const wish = (
-        await request(app.getHttpServer())
-          .post("/wishlist")
-          .set(ann)
-          .send({ title: "Ring" })
-      ).body;
-
-      // Not connected yet -> 400
-      await request(app.getHttpServer())
-        .get("/wishlist/partner")
-        .set(bob)
-        .expect(400);
-
-      const { body } = await request(app.getHttpServer())
-        .post("/users/generate-code")
-        .set(ann);
-      await request(app.getHttpServer())
-        .post("/users/connect")
-        .set(bob)
-        .send({ code: body.inviteCode });
-
-      const partnerList = await request(app.getHttpServer())
-        .get("/wishlist/partner")
-        .set(bob)
-        .expect(200);
-      expect(partnerList.body).toHaveLength(1);
-
-      await request(app.getHttpServer())
-        .post(`/wishlist/${wish.id}/reserve`)
-        .set(ann)
-        .expect(400); // own wish
-
-      const reserved = await request(app.getHttpServer())
-        .post(`/wishlist/${wish.id}/reserve`)
-        .set(bob)
-        .expect(201);
-      expect(reserved.body.reservedById).toBe(users[1].id);
-
-      await request(app.getHttpServer())
-        .delete(`/wishlist/${wish.id}/reserve`)
-        .set(ann)
-        .expect(400); // not the reserver
-
-      await request(app.getHttpServer())
-        .delete(`/wishlist/${wish.id}/reserve`)
-        .set(bob)
+      await api()
+        .post(path + "/invitations/accept")
+        .set(member.auth)
         .expect(204);
+    }
+    const reservations = await Promise.all(
+      [a, b].map((m) =>
+        api()
+          .post(item + "/reserve")
+          .set(m.auth),
+      ),
+    );
+    expect(reservations.map((r) => r.status).sort()).toEqual([201, 409]);
+    const winner = reservations[0].status === 201 ? a : b;
+    const other = winner === a ? b : a;
+    const list = await api()
+      .get(path + "/wishes/paged")
+      .set(other.auth)
+      .expect(200);
+    expect(list.body.data[0]).toMatchObject({
+      isReserved: true,
+      reservedBy: null,
+      reservedById: null,
     });
+    await api()
+      .delete(item + "/reserve")
+      .set(winner.auth)
+      .expect(204);
+    await api()
+      .post(item + "/reserve")
+      .set(other.auth)
+      .expect(201);
+    await api().patch(item).set(other.auth).send({ title: "x" }).expect(404);
+    await api().delete(item).set(other.auth).expect(404);
+    await api().delete("/users/account").set(owner.auth).expect(409);
+    const transfers = await Promise.all(
+      [a, b].map((m) =>
+        api()
+          .post(path + "/members/" + m.id + "/transfer-ownership")
+          .set(owner.auth),
+      ),
+    );
+    expect(transfers.map((r) => r.status).sort()).toEqual([204, 403]);
+    await api().delete("/users/account").set(owner.auth).expect(204);
   });
 });

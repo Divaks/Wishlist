@@ -1,11 +1,4 @@
-import {
-  Entity,
-  PrimaryGeneratedColumn,
-  Column,
-  OneToOne,
-  JoinColumn,
-  OneToMany,
-} from "typeorm";
+import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from "typeorm";
 import { WishItem } from "./wish-item.model";
 import { GroupMember } from "./group-member.model";
 
@@ -23,15 +16,8 @@ export class User {
   @Column({ nullable: true })
   name: string;
 
-  @Column({ unique: true, nullable: true, select: false })
-  inviteCode: string;
-
-  @Column({ type: "uuid", nullable: true })
-  partnerId: string | null;
-
-  @OneToOne(() => User, { nullable: true })
-  @JoinColumn({ name: "partnerId" })
-  partner: User | null;
+  @Column({ type: "date", nullable: true })
+  birthday: string | null;
 
   @OneToMany(() => WishItem, (item) => item.user)
   wishlist: WishItem[];

@@ -1,3 +1,4 @@
+import { WishlistSchema1795300000000 } from "./migrations/1795300000000-wishlist-schema";
 import { Module } from "@nestjs/common";
 import { User } from "./models/user.model";
 import { WishItem } from "./models/wish-item.model";
@@ -5,16 +6,23 @@ import { Group } from "./models/group.model";
 import { GroupMember } from "./models/group-member.model";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { ConfigModule, ConfigService } from "@nestjs/config";
+import { ThrottlerModule, ThrottlerGuard } from "@nestjs/throttler";
+import { APP_GUARD } from "@nestjs/core";
 import { UsersModule } from "./modules/users.module";
 import { AuthModule } from "./modules/auth.module";
 import { WishlistModule } from "./modules/wishlist.module";
 import { GroupsModule } from "./modules/groups.module";
+import { HealthController } from "./controllers/health.controller";
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: [`.env.${process.env.NODE_ENV ?? "local"}`, ".env"],
+      envFilePath: [
+        `.env.${process.env.NODE_ENV ?? "local"}`,
+        ".env",
+        "../.env",
+      ],
     }),
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
@@ -27,15 +35,28 @@ import { GroupsModule } from "./modules/groups.module";
         database: config.get<string>("DB_NAME", "wishlist_db"),
         autoLoadEntities: true,
         entities: [User, WishItem, Group, GroupMember],
-        synchronize: config.get<string>("DB_SYNCHRONIZE", "true") === "true",
+        synchronize: false,
+        migrations: [WishlistSchema1795300000000],
+        migrationsRun: true,
       }),
     }),
+    ThrottlerModule.forRoot([
+      {
+        ttl: 60000,
+        limit: 100,
+      },
+    ]),
     UsersModule,
     AuthModule,
     WishlistModule,
     GroupsModule,
   ],
-  controllers: [],
-  providers: [],
+  controllers: [HealthController],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
+  ],
 })
 export class AppModule {}

@@ -4,6 +4,7 @@ import {
   Column,
   ManyToOne,
   JoinColumn,
+  CreateDateColumn,
 } from "typeorm";
 import { User } from "./user.model";
 
@@ -15,8 +16,11 @@ export enum Priority {
 
 @Entity()
 export class WishItem {
-  @PrimaryGeneratedColumn()
+  @PrimaryGeneratedColumn("uuid")
   id: string;
+
+  @CreateDateColumn()
+  createdAt: Date;
 
   @Column()
   title: string;
@@ -35,6 +39,12 @@ export class WishItem {
 
   @Column({ default: false })
   isInCart: boolean;
+
+  @Column({ nullable: true })
+  occasion: string;
+
+  @Column({ type: "date", nullable: true })
+  occasionDate: string | null;
 
   @Column({ nullable: true })
   userId: string;

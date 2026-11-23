@@ -8,6 +8,10 @@ import { UpdateWishlistDto } from "../../../src/dto/wishlist/update-wishlist.dto
 import { CreateGroupDto } from "../../../src/dto/groups/create-group.dto";
 import { UpdateGroupDto } from "../../../src/dto/groups/update-group.dto";
 import { InviteMemberDto } from "../../../src/dto/groups/invite-member.dto";
+import { UpdateUserDto } from "../../../src/dto/users/update-user.dto";
+import { PaginationDto } from "../../../src/dto/common/pagination.dto";
+import { WishResponseDto } from "../../../src/dto/wishlist/wish-response.dto";
+import { WishItem } from "../../../src/models/wish-item.model";
 
 const failing = async (cls: new () => object, plain: object) =>
   (await validate(plainToInstance(cls, plain))).map((e) => e.property);
@@ -16,7 +20,10 @@ describe("DTO validation", () => {
   describe("CreateUserDto", () => {
     it("accepts a valid payload (name optional)", async () => {
       expect(
-        await failing(CreateUserDto, { email: "a@b.com", password: "123456" }),
+        await failing(CreateUserDto, {
+          email: "a@b.com",
+          password: "password123",
+        }),
       ).toEqual([]);
     });
     it("rejects bad email and short password", async () => {
@@ -30,8 +37,29 @@ describe("DTO validation", () => {
       expect(
         await failing(CreateUserDto, {
           email: "a@b.com",
-          password: "123456",
+          password: "password123",
           name: 5,
+        }),
+      ).toEqual(["name"]);
+    });
+    it("rejects password too short (min 8)", async () => {
+      expect(
+        await failing(CreateUserDto, { email: "a@b.com", password: "short" }),
+      ).toEqual(["password"]);
+    });
+    it("rejects password too long (max 72)", async () => {
+      const longPass = "a".repeat(73);
+      expect(
+        await failing(CreateUserDto, { email: "a@b.com", password: longPass }),
+      ).toEqual(["password"]);
+    });
+    it("rejects name too long (max 100)", async () => {
+      const longName = "a".repeat(101);
+      expect(
+        await failing(CreateUserDto, {
+          email: "a@b.com",
+          password: "password123",
+          name: longName,
         }),
       ).toEqual(["name"]);
     });
@@ -60,6 +88,24 @@ describe("DTO validation", () => {
   });
 
   describe("CreateWishlistDto", () => {
+    it.each([-100_000_000, 100_000_000])(
+      "rejects out-of-range price %s",
+      async (price) => {
+        expect(
+          await failing(CreateWishlistDto, { title: "Book", price }),
+        ).toEqual(["price"]);
+      },
+    );
+
+    it.each([-99_999_999.99, 99_999_999.99])(
+      "accepts price boundary %s",
+      async (price) => {
+        expect(
+          await failing(CreateWishlistDto, { title: "Book", price }),
+        ).toEqual([]);
+      },
+    );
+
     it("accepts title only", async () => {
       expect(await failing(CreateWishlistDto, { title: "Book" })).toEqual([]);
     });
@@ -70,6 +116,8 @@ describe("DTO validation", () => {
           description: "d",
           price: 9.99,
           link: "https://example.com/x",
+          priority: "high",
+          isInCart: true,
         }),
       ).toEqual([]);
     });
@@ -84,9 +132,43 @@ describe("DTO validation", () => {
         ).sort(),
       ).toEqual(["link", "price", "title"]);
     });
+    it("rejects invalid priority value", async () => {
+      expect(
+        await failing(CreateWishlistDto, {
+          title: "Book",
+          priority: "invalid",
+        }),
+      ).toEqual(["priority"]);
+    });
+    it("rejects non-boolean isInCart", async () => {
+      expect(
+        await failing(CreateWishlistDto, {
+          title: "Book",
+          isInCart: "yes",
+        }),
+      ).toEqual(["isInCart"]);
+    });
   });
 
   describe("UpdateWishlistDto", () => {
+    it.each([-100_000_000, 100_000_000])(
+      "rejects out-of-range price %s",
+      async (price) => {
+        expect(
+          await failing(UpdateWishlistDto, { title: "Book", price }),
+        ).toEqual(["price"]);
+      },
+    );
+
+    it.each([-99_999_999.99, 99_999_999.99])(
+      "accepts price boundary %s",
+      async (price) => {
+        expect(
+          await failing(UpdateWishlistDto, { title: "Book", price }),
+        ).toEqual([]);
+      },
+    );
+
     it("accepts an empty payload (all optional)", async () => {
       expect(await failing(UpdateWishlistDto, {})).toEqual([]);
     });
@@ -94,6 +176,14 @@ describe("DTO validation", () => {
       expect(
         (await failing(UpdateWishlistDto, { price: "x", link: "bad" })).sort(),
       ).toEqual(["link", "price"]);
+    });
+    it("accepts optional priority and isInCart", async () => {
+      expect(
+        await failing(UpdateWishlistDto, {
+          priority: "low",
+          isInCart: false,
+        }),
+      ).toEqual([]);
     });
   });
 
@@ -113,6 +203,10 @@ describe("DTO validation", () => {
   });
 
   describe("UpdateGroupDto", () => {
+    it.each([null, ""])("rejects an invalid group name %s", async (name) => {
+      expect(await failing(UpdateGroupDto, { name })).toEqual(["name"]);
+    });
+
     it("accepts an empty payload", async () => {
       expect(await failing(UpdateGroupDto, {})).toEqual([]);
     });
@@ -131,6 +225,161 @@ describe("DTO validation", () => {
       expect(await failing(InviteMemberDto, { email: "nope" })).toEqual([
         "email",
       ]);
+    });
+  });
+
+  describe("UpdateUserDto", () => {
+    it("accepts an empty payload (all optional)", async () => {
+      expect(await failing(UpdateUserDto, {})).toEqual([]);
+    });
+    it("accepts name and birthday", async () => {
+      expect(
+        await failing(UpdateUserDto, {
+          name: "New Name",
+          birthday: "1990-01-01",
+        }),
+      ).toEqual([]);
+    });
+    it("rejects non-string name", async () => {
+      expect(await failing(UpdateUserDto, { name: 123 })).toEqual(["name"]);
+    });
+    it("rejects name too long (max 100)", async () => {
+      const longName = "a".repeat(101);
+      expect(await failing(UpdateUserDto, { name: longName })).toEqual([
+        "name",
+      ]);
+    });
+    it("rejects invalid date format for birthday", async () => {
+      expect(await failing(UpdateUserDto, { birthday: "not-a-date" })).toEqual([
+        "birthday",
+      ]);
+    });
+  });
+
+  describe("PaginationDto", () => {
+    it("accepts default values when not provided", () => {
+      const dto = plainToInstance(PaginationDto, {});
+      expect(dto.page).toBe(1);
+      expect(dto.limit).toBe(20);
+    });
+    it("accepts custom page and limit", () => {
+      const dto = plainToInstance(PaginationDto, { page: 3, limit: 50 });
+      expect(dto.page).toBe(3);
+      expect(dto.limit).toBe(50);
+    });
+    it("rejects page < 1", async () => {
+      expect((await failing(PaginationDto, { page: 0 })).sort()).toEqual([
+        "page",
+      ]);
+    });
+    it("rejects limit < 1", async () => {
+      expect((await failing(PaginationDto, { limit: 0 })).sort()).toEqual([
+        "limit",
+      ]);
+    });
+    it("rejects limit > 100", async () => {
+      expect((await failing(PaginationDto, { limit: 101 })).sort()).toEqual([
+        "limit",
+      ]);
+    });
+  });
+
+  describe("WishResponseDto", () => {
+    it("creates response with all fields when wish has user and reservedBy", () => {
+      const wish = {
+        id: "1",
+        title: "Test",
+        description: "desc",
+        price: 10,
+        link: "https://example.com",
+        priority: "high",
+        isInCart: true,
+        occasion: "birthday",
+        occasionDate: new Date("2024-01-01"),
+        userId: "u1",
+        user: { id: "u1", name: "User", birthday: null },
+        reservedById: "u2",
+        reservedBy: { id: "u2", name: "Reserver", birthday: null },
+      } as unknown as WishItem;
+
+      const response = new WishResponseDto(wish, "u3");
+
+      expect(response.id).toBe("1");
+      expect(response.title).toBe("Test");
+      expect(response.user).toBeDefined();
+      expect(response.reservedBy).toBeDefined();
+      expect(response.reservedById).toBeNull();
+      expect(response.isReserved).toBe(true);
+    });
+
+    it("hides reservation from wish owner", () => {
+      const wish = {
+        id: "1",
+        title: "Test",
+        description: "desc",
+        price: 10,
+        link: "https://example.com",
+        priority: "high",
+        isInCart: true,
+        occasion: "birthday",
+        occasionDate: new Date("2024-01-01"),
+        userId: "u1",
+        user: { id: "u1", name: "User", birthday: null },
+        reservedById: "u2",
+        reservedBy: { id: "u2", name: "Reserver", birthday: null },
+      } as unknown as WishItem;
+
+      const response = new WishResponseDto(wish, "u1");
+
+      expect(response.reservedById).toBeNull();
+      expect(response.reservedBy).toBeNull();
+    });
+
+    it("shows reservation to non-owner", () => {
+      const wish = {
+        id: "1",
+        title: "Test",
+        description: "desc",
+        price: 10,
+        link: "https://example.com",
+        priority: "high",
+        isInCart: true,
+        occasion: "birthday",
+        occasionDate: new Date("2024-01-01"),
+        userId: "u1",
+        user: { id: "u1", name: "User", birthday: null },
+        reservedById: "u2",
+        reservedBy: { id: "u2", name: "Reserver", birthday: null },
+      } as unknown as WishItem;
+
+      const response = new WishResponseDto(wish, "u3");
+
+      expect(response.reservedById).toBeNull();
+      expect(response.isReserved).toBe(true);
+      expect(response.reservedBy).toBeDefined();
+    });
+
+    it("handles wish without user", () => {
+      const wish = {
+        id: "1",
+        title: "Test",
+        description: null,
+        price: 0,
+        link: null,
+        priority: "medium",
+        isInCart: false,
+        occasion: null,
+        occasionDate: null,
+        userId: "u1",
+        user: null,
+        reservedById: null,
+        reservedBy: null,
+      } as unknown as WishItem;
+
+      const response = new WishResponseDto(wish, "u1");
+
+      expect(response.user).toBeDefined();
+      expect(response.user).toBeNull();
     });
   });
 });

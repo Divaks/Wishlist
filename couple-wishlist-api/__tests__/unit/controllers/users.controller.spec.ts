@@ -2,12 +2,13 @@ import { Test } from "@nestjs/testing";
 import { NotFoundException } from "@nestjs/common";
 import { UsersController } from "../../../src/controllers/users.controller";
 import { UsersService } from "../../../src/services/users.service";
+import { UpdateUserDto } from "../../../src/dto/users/update-user.dto";
 
 describe("UsersController", () => {
   let controller: UsersController;
   const usersService = {
-    generateInviteCode: jest.fn(),
-    connectPartner: jest.fn(),
+    updateProfile: jest.fn(),
+    deleteAccount: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -20,27 +21,28 @@ describe("UsersController", () => {
   });
 
   it("getProfile returns the authenticated user", () => {
-    const user = { userId: "u1", email: "a@b.com", partnerId: null };
+    const user = { userId: "u1", email: "a@b.com" };
     expect(controller.getProfile(user)).toBe(user);
   });
 
-  it("generateCode delegates to the service", async () => {
-    usersService.generateInviteCode.mockResolvedValue({ inviteCode: "ABC" });
-    await expect(controller.generateCode("u1")).resolves.toEqual({
-      inviteCode: "ABC",
+  it("updateProfile delegates to the service", async () => {
+    const dto: UpdateUserDto = { name: "New Name", birthday: "1990-01-01" };
+    usersService.updateProfile.mockResolvedValue({ id: "u1", ...dto });
+    await expect(controller.updateProfile("u1", dto)).resolves.toEqual({
+      id: "u1",
+      ...dto,
     });
-    expect(usersService.generateInviteCode).toHaveBeenCalledWith("u1");
+    expect(usersService.updateProfile).toHaveBeenCalledWith("u1", dto);
   });
 
-  it("connect delegates user id and code", async () => {
-    usersService.connectPartner.mockResolvedValue({ inviteCode: "ABC" });
-    await controller.connect("u1", "ABC");
-    expect(usersService.connectPartner).toHaveBeenCalledWith("u1", "ABC");
+  it("deleteAccount delegates to the service", async () => {
+    await controller.deleteAccount("u1");
+    expect(usersService.deleteAccount).toHaveBeenCalledWith("u1");
   });
 
-  it("connect propagates service errors", async () => {
-    usersService.connectPartner.mockRejectedValue(new NotFoundException());
-    await expect(controller.connect("u1", "BAD")).rejects.toThrow(
+  it("deleteAccount propagates NotFound", async () => {
+    usersService.deleteAccount.mockRejectedValue(new NotFoundException());
+    await expect(controller.deleteAccount("u1")).rejects.toThrow(
       NotFoundException,
     );
   });

@@ -2,18 +2,23 @@ import { Test } from "@nestjs/testing";
 import { ForbiddenException } from "@nestjs/common";
 import { GroupsController } from "../../../src/controllers/groups.controller";
 import { GroupsService } from "../../../src/services/groups.service";
+import { PaginationDto } from "../../../src/dto/common/pagination.dto";
 
 describe("GroupsController", () => {
   let controller: GroupsController;
   const service = {
     create: jest.fn(),
+    invitations: jest.fn(),
+    acceptInvitation: jest.fn(),
     findMyGroups: jest.fn(),
     findOne: jest.fn(),
     update: jest.fn(),
     remove: jest.fn(),
     inviteMember: jest.fn(),
     removeMember: jest.fn(),
+    transferOwnership: jest.fn(),
     getGroupWishes: jest.fn(),
+    getMemberWishes: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -25,14 +30,34 @@ describe("GroupsController", () => {
     controller = module.get(GroupsController);
   });
 
+  const pagination: PaginationDto = { page: 1, limit: 20 };
+
+  it("routes invitations for the authenticated user", async () => {
+    await controller.invitations("u1");
+    await controller.accept("u1", "g1");
+    expect(service.invitations).toHaveBeenCalledWith("u1");
+    expect(service.acceptInvitation).toHaveBeenCalledWith("u1", "g1");
+  });
+  it("keeps findMyGroups array responses for legacy clients", async () => {
+    service.findMyGroups.mockResolvedValue({ data: [{ id: "first" }] });
+    expect(await controller.findMyGroupsArray("u1")).toEqual([{ id: "first" }]);
+    expect(service.findMyGroups).toHaveBeenCalledWith("u1", null);
+  });
+  it("keeps getGroupWishes array responses for legacy clients", async () => {
+    service.getGroupWishes.mockResolvedValue({ data: [{ id: "first" }] });
+    expect(await controller.getGroupWishesArray("u1", "g1")).toEqual([
+      { id: "first" },
+    ]);
+    expect(service.getGroupWishes).toHaveBeenCalledWith("u1", "g1", null);
+  });
   it("create", async () => {
     await controller.create("u1", { name: "G" });
     expect(service.create).toHaveBeenCalledWith("u1", { name: "G" });
   });
 
   it("findMyGroups", async () => {
-    await controller.findMyGroups("u1");
-    expect(service.findMyGroups).toHaveBeenCalledWith("u1");
+    await controller.findMyGroups("u1", pagination);
+    expect(service.findMyGroups).toHaveBeenCalledWith("u1", pagination);
   });
 
   it("findOne", async () => {
@@ -60,9 +85,29 @@ describe("GroupsController", () => {
     expect(service.removeMember).toHaveBeenCalledWith("u1", "g1", "u2");
   });
 
+  it("transferOwnership", async () => {
+    await controller.transferOwnership("u1", "g1", "u2");
+    expect(service.transferOwnership).toHaveBeenCalledWith("u1", "g1", "u2");
+  });
+
+  it("leaveGroup", async () => {
+    await controller.leaveGroup("u1", "g1");
+    expect(service.removeMember).toHaveBeenCalledWith("u1", "g1", "u1");
+  });
+
   it("getGroupWishes", async () => {
-    await controller.getGroupWishes("u1", "g1");
-    expect(service.getGroupWishes).toHaveBeenCalledWith("u1", "g1");
+    await controller.getGroupWishes("u1", "g1", pagination);
+    expect(service.getGroupWishes).toHaveBeenCalledWith("u1", "g1", pagination);
+  });
+
+  it("getMemberWishes", async () => {
+    await controller.getMemberWishes("u1", "g1", "u2", pagination);
+    expect(service.getMemberWishes).toHaveBeenCalledWith(
+      "u1",
+      "g1",
+      "u2",
+      pagination,
+    );
   });
 
   it("propagates Forbidden errors", async () => {
