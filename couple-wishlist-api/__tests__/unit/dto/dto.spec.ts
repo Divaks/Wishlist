@@ -88,6 +88,24 @@ describe("DTO validation", () => {
   });
 
   describe("CreateWishlistDto", () => {
+    it.each([-100_000_000, 100_000_000])(
+      "rejects out-of-range price %s",
+      async (price) => {
+        expect(
+          await failing(CreateWishlistDto, { title: "Book", price }),
+        ).toEqual(["price"]);
+      },
+    );
+
+    it.each([-99_999_999.99, 99_999_999.99])(
+      "accepts price boundary %s",
+      async (price) => {
+        expect(
+          await failing(CreateWishlistDto, { title: "Book", price }),
+        ).toEqual([]);
+      },
+    );
+
     it("accepts title only", async () => {
       expect(await failing(CreateWishlistDto, { title: "Book" })).toEqual([]);
     });
@@ -133,6 +151,24 @@ describe("DTO validation", () => {
   });
 
   describe("UpdateWishlistDto", () => {
+    it.each([-100_000_000, 100_000_000])(
+      "rejects out-of-range price %s",
+      async (price) => {
+        expect(
+          await failing(UpdateWishlistDto, { title: "Book", price }),
+        ).toEqual(["price"]);
+      },
+    );
+
+    it.each([-99_999_999.99, 99_999_999.99])(
+      "accepts price boundary %s",
+      async (price) => {
+        expect(
+          await failing(UpdateWishlistDto, { title: "Book", price }),
+        ).toEqual([]);
+      },
+    );
+
     it("accepts an empty payload (all optional)", async () => {
       expect(await failing(UpdateWishlistDto, {})).toEqual([]);
     });
@@ -167,6 +203,10 @@ describe("DTO validation", () => {
   });
 
   describe("UpdateGroupDto", () => {
+    it.each([null, ""])("rejects an invalid group name %s", async (name) => {
+      expect(await failing(UpdateGroupDto, { name })).toEqual(["name"]);
+    });
+
     it("accepts an empty payload", async () => {
       expect(await failing(UpdateGroupDto, {})).toEqual([]);
     });

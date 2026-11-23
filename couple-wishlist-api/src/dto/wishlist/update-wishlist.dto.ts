@@ -2,6 +2,8 @@ import {
   IsString,
   IsOptional,
   IsNumber,
+  Min,
+  Max,
   IsUrl,
   IsEnum,
   IsBoolean,
@@ -19,6 +21,8 @@ export class UpdateWishlistDto {
   description?: string;
 
   @IsNumber()
+  @Min(-99_999_999.99)
+  @Max(99_999_999.99)
   @ValidateIf((_object, value: unknown) => value !== undefined)
   price?: number;
 

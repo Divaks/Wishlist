@@ -1,8 +1,9 @@
-import { IsString, IsOptional } from "class-validator";
+import { IsString, IsOptional, IsNotEmpty, ValidateIf } from "class-validator";
 
 export class UpdateGroupDto {
   @IsString()
-  @IsOptional()
+  @IsNotEmpty()
+  @ValidateIf((_object, value: unknown) => value !== undefined)
   name?: string;
 
   @IsString()

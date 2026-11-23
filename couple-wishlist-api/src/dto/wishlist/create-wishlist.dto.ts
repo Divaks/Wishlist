@@ -3,6 +3,8 @@ import {
   IsNotEmpty,
   IsOptional,
   IsNumber,
+  Min,
+  Max,
   IsUrl,
   IsEnum,
   IsBoolean,
@@ -20,6 +22,8 @@ export class CreateWishlistDto {
   description?: string;
 
   @IsNumber()
+  @Min(-99_999_999.99)
+  @Max(99_999_999.99)
   @ValidateIf((_object, value: unknown) => value !== undefined)
   price?: number;
 

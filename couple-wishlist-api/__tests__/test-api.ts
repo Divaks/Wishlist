@@ -1,285 +1,441 @@
-const BASE_URL = process.env.API_URL || "http://localhost:3000";
+import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 
-// Кольори для зручного виводу в консоль
-const GREEN = "\x1b[32m";
-const RED = "\x1b[31m";
-const CYAN = "\x1b[36m";
-const RESET = "\x1b[0m";
+const baseUrl = (process.env.API_URL ?? "http://127.0.0.1:3000").replace(
+  /\/$/,
+  "",
+);
+const runId = randomUUID();
+const password = randomUUID();
+const checked = new Set<string>();
 
-async function request(
+type Account = { id: string; email: string; token: string };
+type Page<T> = {
+  data: T[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+};
+type Group = {
+  id: string;
+  name: string;
+  createdById: string;
+  members: { userId: string; role: string }[];
+};
+type Wish = {
+  id: string;
+  title: string;
+  price: number;
+  isInCart: boolean;
+  isReserved: boolean;
+  reservedById: string | null;
+  reservedBy: unknown;
+};
+type Profile = {
+  userId: string;
+  email: string;
+  name: string;
+  birthday: string | null;
+};
+
+async function request<T = void>(
   method: string,
   path: string,
-  token?: string,
-  body?: Record<string, any>,
-) {
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
-  }
-
-  const res = await fetch(`${BASE_URL}${path}`, {
+  expected: number,
+  account?: Account,
+  body?: object,
+  route = path.split("?")[0],
+): Promise<T> {
+  const response = await fetch(baseUrl + path, {
     method,
-    headers,
-    body: body ? JSON.stringify(body) : undefined,
-  });
-
-  const text = await res.text();
-  let data: any = null;
-  try {
-    data = text ? JSON.parse(text) : null;
-  } catch {
-    data = text;
-  }
-
-  return { status: res.status, data };
-}
-
-function assert(condition: boolean, message: string, details?: any) {
-  if (condition) {
-    console.log(`${GREEN}✔ PASS:${RESET} ${message}`);
-  } else {
-    console.error(`${RED}✘ FAIL:${RESET} ${message}`);
-    if (details !== undefined) {
-      console.error("  Деталі відповіді:", JSON.stringify(details, null, 2));
-    }
-    process.exit(1);
-  }
-}
-
-async function runE2ETests() {
-  console.log(
-    `${CYAN}🚀 Запуск автоматичного тестування API (${BASE_URL})...${RESET}\n`,
-  );
-
-  const timestamp = Date.now();
-  const userA = {
-    email: `user_a_${timestamp}@test.com`,
-    password: "Password123!",
-    name: "Dmytro",
-  };
-  const userB = {
-    email: `user_b_${timestamp}@test.com`,
-    password: "Password123!",
-    name: "Olena",
-  };
-
-  // --- 1. РЕЄСТРАЦІЯ ТА ЛОГІН ---
-  console.log(`${CYAN}[1] Тестування Auth (Register & Login)${RESET}`);
-
-  const regA = await request("POST", "/auth/register", undefined, userA);
-  assert(
-    regA.status === 201 || regA.status === 200,
-    "Реєстрація Користувача А",
-    regA,
-  );
-
-  const regB = await request("POST", "/auth/register", undefined, userB);
-  assert(
-    regB.status === 201 || regB.status === 200,
-    "Реєстрація Користувача Б",
-    regB,
-  );
-
-  const loginA = await request("POST", "/auth/login", undefined, {
-    email: userA.email,
-    password: userA.password,
-  });
-  const tokenA = loginA.data?.accessToken || loginA.data?.access_token;
-  assert(
-    (loginA.status === 200 || loginA.status === 201) && Boolean(tokenA),
-    "Логін Користувача А та отримання JWT",
-  );
-
-  const loginB = await request("POST", "/auth/login", undefined, {
-    email: userB.email,
-    password: userB.password,
-  });
-  const tokenB = loginB.data?.accessToken || loginB.data?.access_token;
-  assert(
-    (loginB.status === 200 || loginB.status === 201) && Boolean(tokenB),
-    "Логін Користувача Б та отримання JWT",
-  );
-
-  // Перевірка 401 при невірному паролі
-  const badLogin = await request("POST", "/auth/login", undefined, {
-    email: userA.email,
-    password: "WrongPassword!",
-  });
-  assert(
-    badLogin.status === 401,
-    "Відхилення невірного пароля (401)",
-    badLogin,
-  );
-
-  // --- 2. ПРОФІЛЬ ТА ЗВ'ЯЗОК ПАРТНЕРІВ ---
-  console.log(`\n${CYAN}[2] Тестування профілю${RESET}`);
-
-  const profileA = await request("GET", "/users/profile", tokenA);
-  assert(
-    profileA.status === 200 && profileA.data?.email === userA.email,
-    "Отримання профілю Користувача А",
-    profileA,
-  );
-
-  // --- 4. ГРУПИ (GROUPS) ---
-  console.log(`\n${CYAN}[3] Тестування Groups${RESET}`);
-
-  const createGroup = await request("POST", "/groups", tokenA, {
-    name: "Новий Рік 2027",
-    description: "Спільні бажання друзів",
-  });
-  const groupId = createGroup.data?.id;
-  assert(
-    createGroup.status === 201 && Boolean(groupId),
-    `Створення групи Користувачем А (ID: ${groupId})`,
-    createGroup,
-  );
-
-  const inviteMember = await request(
-    "POST",
-    `/groups/${groupId}/members`,
-    tokenA,
-    {
-      email: userB.email,
+    headers: {
+      ...(account && { Authorization: `Bearer ${account.token}` }),
+      ...(body && { "Content-Type": "application/json" }),
     },
-  );
-  assert(
-    inviteMember.status === 201 || inviteMember.status === 200,
-    "Додавання Користувача Б у групу",
-    inviteMember,
-  );
-
-  const acceptance = await request(
-    "POST",
-    `/groups/${groupId}/invitations/accept`,
-    tokenB,
-  );
-  assert(acceptance.status === 204, "Прийняття запрошення");
-  // --- 3. WISHLIST CRUD + БРОНЮВАННЯ ---
-  console.log(
-    `\n${CYAN}[4] Тестування Wishlist (CRUD + Partner View + Reserve)${RESET}`,
-  );
-
-  const createWish = await request("POST", "/wishlist", tokenA, {
-    title: "Навушники Sony WH-1000XM5",
-    description: "Чорні",
-    price: 12500,
-    link: "https://example.com/sony",
+    body: body && JSON.stringify(body),
+    signal: AbortSignal.timeout(10000),
+    redirect: "error",
   });
-  const wishId = createWish.data?.id;
-  assert(
-    createWish.status === 201 && Boolean(wishId),
-    `Створення бажання Користувачем А (ID: ${wishId})`,
-    createWish,
+  assert.equal(
+    response.status,
+    expected,
+    `${method} ${path} expected ${expected}, got ${response.status}`,
   );
-
-  const myWishes = await request("GET", "/wishlist/paged", tokenA);
-  assert(
-    myWishes.status === 200 &&
-      Array.isArray(myWishes.data.data) &&
-      myWishes.data.data.some((w: any) => w.id === wishId),
-    "Перегляд власного списку бажань Користувачем А",
-    myWishes,
-  );
-
-  // Користувач Б дивиться вішліст партнера А
-  const partnerWishes = await request(
-    "GET",
-    `/groups/${groupId}/wishes/paged`,
-    tokenB,
-  );
-  assert(
-    partnerWishes.status === 200 &&
-      Array.isArray(partnerWishes.data.data) &&
-      partnerWishes.data.data.some((w: any) => w.id === wishId),
-    "Перегляд вішліста партнера Користувачем Б",
-    partnerWishes,
-  );
-
-  // Негативний тест: Користувач Б намагається змінити чуже бажання (PATCH)
-  const hackPatch = await request("PATCH", `/wishlist/${wishId}`, tokenB, {
-    title: "Зламано",
-  });
-  assert(
-    hackPatch.status === 403 || hackPatch.status === 404,
-    "Заборона редагування чужого бажання (403/404)",
-    hackPatch,
-  );
-
-  // Власник А редагує своє бажання (PATCH)
-  const patchWish = await request("PATCH", `/wishlist/${wishId}`, tokenA, {
-    price: 11900,
-  });
-  assert(
-    patchWish.status === 200 && Number(patchWish.data?.price) === 11900,
-    "Оновлення ціни бажання власником (PATCH)",
-    patchWish,
-  );
-
-  // Партнер Б бронює бажання
-  const reserveWish = await request(
-    "POST",
-    `/wishlist/${wishId}/reserve`,
-    tokenB,
-  );
-  assert(
-    reserveWish.status === 201 || reserveWish.status === 200,
-    "Бронювання бажання партнером (POST /reserve)",
-    reserveWish,
-  );
-
-  // Партнер Б знімає бронь
-  const unreserveWish = await request(
-    "DELETE",
-    `/wishlist/${wishId}/reserve`,
-    tokenB,
-  );
-  assert(
-    unreserveWish.status === 204 || unreserveWish.status === 200,
-    "Зняття броні партнером (DELETE /reserve)",
-    unreserveWish,
-  );
-
-  const groupWishes = await request(
-    "GET",
-    `/groups/${groupId}/wishes/paged`,
-    tokenB,
-  );
-  assert(
-    groupWishes.status === 200 && Array.isArray(groupWishes.data.data),
-    "Перегляд бажань учасників групи Користувачем Б",
-    groupWishes,
-  );
-
-  // --- 5. ОЧИЩЕННЯ (DELETE) ---
-  console.log(`\n${CYAN}[5] Тестування видалення (Cleanup)${RESET}`);
-
-  const deleteWish = await request("DELETE", `/wishlist/${wishId}`, tokenA);
-  assert(
-    deleteWish.status === 200 || deleteWish.status === 204,
-    "Видалення бажання власником (DELETE)",
-    deleteWish,
-  );
-
-  const deleteGroup = await request("DELETE", `/groups/${groupId}`, tokenA);
-  assert(
-    deleteGroup.status === 204 || deleteGroup.status === 200,
-    "Видалення групи власником (DELETE)",
-    deleteGroup,
-  );
-
-  for (const token of [tokenA, tokenB]) {
-    const deleted = await request("DELETE", "/users/account", token);
-    assert(deleted.status === 204, "Видалення тестового облікового запису");
+  const key = `${method} ${route}`;
+  if (response.ok && !checked.has(key)) {
+    checked.add(key);
+    console.log(`PASS ${key}`);
   }
-  console.log(
-    `\n${GREEN}УСІ ТЕСТИ ПРОЙДЕНО УСПІШНО! Бекенд повністю працездатний.${RESET}`,
+  if (expected === 204) {
+    assert.equal(await response.text(), "");
+    return undefined as T;
+  }
+  return (await response.json()) as T;
+}
+
+const accounts: Account[] = [];
+let group: Group | undefined;
+let groupOwner: Account | undefined;
+
+async function register(name: string) {
+  const email = `smoke-${runId}-${name}@example.org`;
+  const credentials = { email, password };
+  const created = await request<{
+    id: string;
+    email: string;
+    password?: string;
+  }>("POST", "/auth/register", 201, undefined, { ...credentials, name });
+  assert.equal(created.email, email);
+  assert.equal(created.password, undefined);
+  const { accessToken } = await request<{ accessToken: string }>(
+    "POST",
+    "/auth/login",
+    201,
+    undefined,
+    credentials,
+  );
+  assert.ok(accessToken);
+  const account = { id: created.id, email, token: accessToken };
+  accounts.push(account);
+  return account;
+}
+
+function checkPage<T extends { id: string }>(page: Page<T>, id: string) {
+  assert.equal(page.page, 1);
+  assert.equal(page.limit, 1);
+  assert.equal(page.total, 1);
+  assert.equal(page.totalPages, 1);
+  assert.deepEqual(
+    page.data.map((item) => item.id),
+    [id],
   );
 }
 
-runE2ETests().catch((err) => {
-  console.error(`${RED}Критична помилка під час запуску тестів:${RESET}`, err);
-  process.exit(1);
+async function smoke() {
+  const health = await request<{ status: string; timestamp: string }>(
+    "GET",
+    "/health",
+    200,
+  );
+  assert.equal(health.status, "ok");
+  assert.ok(Number.isFinite(Date.parse(health.timestamp)));
+  await request("GET", "/users/profile", 401);
+  const owner = await register("owner");
+  const member = await register("member");
+  const guest = await register("guest");
+  await request("POST", "/auth/login", 401, undefined, {
+    email: owner.email,
+    password: "wrong-password",
+  });
+  const profile = await request<Profile>("GET", "/users/profile", 200, owner);
+  assert.equal(profile.userId, owner.id);
+  await request("PATCH", "/users/profile", 400, owner, {
+    birthday: "2026-02-30",
+  });
+  await request("PATCH", "/users/profile", 200, owner, {
+    name: "Smoke owner",
+    birthday: "2000-02-29",
+  });
+  assert.equal(
+    (await request<Profile>("GET", "/users/profile", 200, owner)).birthday,
+    "2000-02-29",
+  );
+
+  group = await request<Group>("POST", "/groups", 201, owner, {
+    name: `Smoke ${runId}`,
+  });
+  groupOwner = owner;
+  const groupPath = `/groups/${group.id}`;
+  const ownGroups = await request<Group[]>("GET", "/groups", 200, owner);
+  assert.deepEqual(
+    ownGroups.map((item) => item.id),
+    [group.id],
+  );
+  checkPage(
+    await request<Page<Group>>(
+      "GET",
+      "/groups/paged?page=1&limit=1",
+      200,
+      owner,
+    ),
+    group.id,
+  );
+  assert.equal(
+    (
+      await request<Group>(
+        "GET",
+        groupPath,
+        200,
+        owner,
+        undefined,
+        "/groups/:id",
+      )
+    ).createdById,
+    owner.id,
+  );
+  await request("PATCH", groupPath, 400, owner, { name: null }, "/groups/:id");
+  const updatedGroup = await request<Group>(
+    "PATCH",
+    groupPath,
+    200,
+    owner,
+    { name: "Renamed smoke group" },
+    "/groups/:id",
+  );
+  assert.equal(updatedGroup.name, "Renamed smoke group");
+
+  for (const invitee of [member, guest]) {
+    const invitation = await request<{ status: string }>(
+      "POST",
+      groupPath + "/members",
+      201,
+      owner,
+      { email: invitee.email },
+      "/groups/:id/members",
+    );
+    assert.equal(invitation.status, "pending");
+    const pending = await request<{ groupId: string }[]>(
+      "GET",
+      "/groups/invitations",
+      200,
+      invitee,
+    );
+    assert.deepEqual(pending, [{ groupId: group.id }]);
+    await request(
+      "GET",
+      groupPath + "/wishes",
+      403,
+      invitee,
+      undefined,
+      "/groups/:id/wishes",
+    );
+    await request(
+      "POST",
+      groupPath + "/invitations/accept",
+      204,
+      invitee,
+      undefined,
+      "/groups/:id/invitations/accept",
+    );
+    assert.deepEqual(
+      await request("GET", "/groups/invitations", 200, invitee),
+      [],
+    );
+  }
+
+  await request("POST", "/wishlist", 400, owner, {
+    title: "Invalid price",
+    price: 100_000_000,
+  });
+  const wish = await request<Wish>("POST", "/wishlist", 201, owner, {
+    title: "Smoke wish",
+    price: 12.5,
+    isInCart: true,
+  });
+  assert.equal(wish.isInCart, true);
+  const wishPath = `/wishlist/${wish.id}`;
+  await request(
+    "PATCH",
+    wishPath,
+    400,
+    owner,
+    { price: -100_000_000 },
+    "/wishlist/:id",
+  );
+  assert.deepEqual(
+    (await request<Wish[]>("GET", "/wishlist", 200, owner)).map(
+      (item) => item.id,
+    ),
+    [wish.id],
+  );
+  checkPage(
+    await request<Page<Wish>>(
+      "GET",
+      "/wishlist/paged?page=1&limit=1",
+      200,
+      owner,
+    ),
+    wish.id,
+  );
+  assert.equal(
+    (
+      await request<Wish>(
+        "GET",
+        wishPath,
+        200,
+        owner,
+        undefined,
+        "/wishlist/:id",
+      )
+    ).price,
+    12.5,
+  );
+  const edited = await request<Wish>(
+    "PATCH",
+    wishPath,
+    200,
+    owner,
+    { title: "Edited smoke wish" },
+    "/wishlist/:id",
+  );
+  assert.equal(edited.title, "Edited smoke wish");
+
+  const groupWishes = await request<Wish[]>(
+    "GET",
+    groupPath + "/wishes",
+    200,
+    member,
+    undefined,
+    "/groups/:id/wishes",
+  );
+  assert.deepEqual(
+    groupWishes.map((item) => item.id),
+    [wish.id],
+  );
+  checkPage(
+    await request<Page<Wish>>(
+      "GET",
+      groupPath + "/wishes/paged?limit=1",
+      200,
+      member,
+      undefined,
+      "/groups/:id/wishes/paged",
+    ),
+    wish.id,
+  );
+  const memberWishes = groupPath + "/wishes/" + owner.id + "?limit=1";
+  checkPage(
+    await request<Page<Wish>>(
+      "GET",
+      memberWishes,
+      200,
+      member,
+      undefined,
+      "/groups/:id/wishes/:memberId",
+    ),
+    wish.id,
+  );
+
+  const reservation = await request<Wish>(
+    "POST",
+    wishPath + "/reserve",
+    201,
+    member,
+    undefined,
+    "/wishlist/:id/reserve",
+  );
+  assert.equal(reservation.reservedById, member.id);
+  const hidden = await request<Wish>(
+    "GET",
+    wishPath,
+    200,
+    owner,
+    undefined,
+    "/wishlist/:id",
+  );
+  assert.equal(hidden.isReserved, false);
+  assert.equal(hidden.reservedById, null);
+  const visible = await request<Page<Wish>>(
+    "GET",
+    memberWishes,
+    200,
+    guest,
+    undefined,
+    "/groups/:id/wishes/:memberId",
+  );
+  assert.equal(visible.data[0].isReserved, true);
+  assert.equal(visible.data[0].reservedBy, null);
+  await request(
+    "DELETE",
+    wishPath + "/reserve",
+    204,
+    member,
+    undefined,
+    "/wishlist/:id/reserve",
+  );
+  const cleared = await request<Page<Wish>>(
+    "GET",
+    memberWishes,
+    200,
+    guest,
+    undefined,
+    "/groups/:id/wishes/:memberId",
+  );
+  assert.equal(cleared.data[0].isReserved, false);
+
+  await request(
+    "DELETE",
+    groupPath + "/members/" + guest.id,
+    204,
+    owner,
+    undefined,
+    "/groups/:id/members/:targetUserId",
+  );
+  await request("GET", groupPath, 403, guest, undefined, "/groups/:id");
+  await request(
+    "POST",
+    groupPath + "/members/" + member.id + "/transfer-ownership",
+    204,
+    owner,
+    undefined,
+    "/groups/:id/members/:targetUserId/transfer-ownership",
+  );
+  groupOwner = member;
+  assert.equal(
+    (
+      await request<Group>(
+        "GET",
+        groupPath,
+        200,
+        member,
+        undefined,
+        "/groups/:id",
+      )
+    ).createdById,
+    member.id,
+  );
+  await request(
+    "DELETE",
+    groupPath + "/leave",
+    204,
+    owner,
+    undefined,
+    "/groups/:id/leave",
+  );
+  await request("DELETE", wishPath, 204, owner, undefined, "/wishlist/:id");
+  await request("GET", wishPath, 404, owner, undefined, "/wishlist/:id");
+}
+
+async function main() {
+  try {
+    await smoke();
+  } finally {
+    // Continue cleanup after an assertion failure and only touch fixtures created by this run.
+    const failures: unknown[] = [];
+    if (group && groupOwner) {
+      await request(
+        "DELETE",
+        `/groups/${group.id}`,
+        204,
+        groupOwner,
+        undefined,
+        "/groups/:id",
+      ).catch((error: unknown) => failures.push(error));
+    }
+    for (const account of accounts) {
+      await request("DELETE", "/users/account", 204, account).catch(
+        (error: unknown) => failures.push(error),
+      );
+    }
+    for (const error of failures) console.error("Cleanup failed", error);
+    if (failures.length) process.exitCode = 1;
+  }
+  if (!process.exitCode)
+    console.log(`Passed HTTP checks for ${checked.size} routes`);
+}
+
+void main().catch((error: unknown) => {
+  console.error(error);
+  process.exitCode = 1;
 });
