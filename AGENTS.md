@@ -83,7 +83,25 @@ invite existing accounts and reserve each other's wishes.
 See the [documentation index](docs/README.md) for source references and agent
 discovery. Load only the material relevant to the task.
 
+## Context Efficiency
+
+- Inspect only files relevant to the current task.
+- Load skills and documentation on demand.
+- Avoid redundant file reads and tool calls.
+- Prefer targeted searches over broad repository scans.
+- Keep progress updates concise.
+- Avoid unnecessary refactoring.
+- Run verification proportional to the scope and risk.
+- Do not repeat information already established.
+
 ## Communication
 
-Use concise technical Ukrainian. For substantial changes, briefly state the
-approach. In the final response list changes, checks, outcomes and limitations.
+- Respond in the language used by the user.
+- Use English for code, comments, documentation,
+  commit messages, PR descriptions, and code review findings.
+- Be concise and technical.
+- Avoid unnecessary explanations and repetition.
+- Do not narrate routine actions.
+- Report results, verification, and remaining issues.
+- Provide detailed explanations only when requested
+  or necessary for correctness.
