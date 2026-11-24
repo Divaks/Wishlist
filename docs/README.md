@@ -17,6 +17,9 @@ Source code is authoritative for implemented behavior. Tests verify specific
 scenarios and CI defines automated checks. The [root instructions](../AGENTS.md)
 state mandatory invariants. Record implementation gaps against those invariants.
 
+For documentation upkeep after repository changes or when checking a commit,
+use the [update-doc skill](../.agents/skills/update-doc/SKILL.md).
+
 ## Agent discovery
 
 - Codex reads `AGENTS.md` along the directory chain to its working directory.

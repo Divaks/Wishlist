@@ -46,6 +46,9 @@ invite existing accounts and reserve each other's wishes.
   Commit or push only when explicitly requested.
 - Add or update regression coverage for new or changed behavior and run relevant
   checks. For documentation, verify references, commands and the diff.
+- Before finishing changes to repository structure or adding or changing
+  functionality, check documentation impact and update affected docs in the
+  same change. Follow the `update-doc` workflow.
 - Report completed checks and any verification limits accurately.
 
 ## Code Review Rules
@@ -75,6 +78,7 @@ invite existing accounts and reserve each other's wishes.
 | Targeted security review or audit | [security-review](.agents/skills/security-review/SKILL.md) |
 | Reviewing or implementing schema changes | [database-migration](.agents/skills/database-migration/SKILL.md) |
 | Selecting, writing or running tests | [testing](.agents/skills/testing/SKILL.md) |
+| Updating docs after a change or auditing a commit for documentation impact | [update-doc](.agents/skills/update-doc/SKILL.md) |
 
 See the [documentation index](docs/README.md) for source references and agent
 discovery. Load only the material relevant to the task.
