@@ -42,7 +42,8 @@ invite existing accounts and reserve each other's wishes.
 
 - Check working tree status before disruptive operations. Preserve user changes
   and avoid destructive Git commands, including `git reset --hard`.
-- Use descriptive branches. Commit or push only when explicitly requested.
+- Use `WL-<PR number>` branches for pull requests. Follow the [Git workflow](docs/git-workflow.md).
+  Commit or push only when explicitly requested.
 - Add or update regression coverage for new or changed behavior and run relevant
   checks. For documentation, verify references, commands and the diff.
 - Report completed checks and any verification limits accurately.
