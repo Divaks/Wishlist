@@ -14,6 +14,12 @@ export enum Priority {
   HIGH = "high",
 }
 
+export enum WishCurrency {
+  UAH = "UAH",
+  EUR = "EUR",
+  USD = "USD",
+}
+
 @Entity()
 export class WishItem {
   @PrimaryGeneratedColumn("uuid")
@@ -31,8 +37,19 @@ export class WishItem {
   @Column("decimal", { precision: 10, scale: 2, default: 0 })
   price: number;
 
+  @Column({
+    type: "enum",
+    enum: WishCurrency,
+    enumName: "wish_currency",
+    default: WishCurrency.UAH,
+  })
+  currency: WishCurrency;
+
   @Column({ nullable: true })
   link: string;
+
+  @Column("text", { nullable: true })
+  photoKey: string | null;
 
   @Column({ type: "enum", enum: Priority, default: Priority.MEDIUM })
   priority: Priority;

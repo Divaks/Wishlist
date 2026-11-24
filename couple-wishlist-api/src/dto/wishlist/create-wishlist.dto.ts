@@ -10,7 +10,7 @@ import {
   IsBoolean,
   ValidateIf,
 } from "class-validator";
-import { Priority } from "../../models/wish-item.model";
+import { Priority, WishCurrency } from "../../models/wish-item.model";
 
 export class CreateWishlistDto {
   @IsString()
@@ -26,6 +26,10 @@ export class CreateWishlistDto {
   @Max(99_999_999.99)
   @ValidateIf((_object, value: unknown) => value !== undefined)
   price?: number;
+
+  @IsEnum(WishCurrency)
+  @ValidateIf((_object, value: unknown) => value !== undefined)
+  currency?: WishCurrency;
 
   @IsUrl({ protocols: ["http", "https"] })
   @IsOptional()

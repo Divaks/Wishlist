@@ -37,3 +37,38 @@ routes. Keep the `/api` prefix rewrite in a same-origin proxy, or supply an
 absolute `VITE_API_URL` at build time and configure the API's CORS origins.
 The repository defines CI and local database infrastructure. Production
 hosting and release procedures are environment-specific.
+
+
+## Wish photo storage
+
+Set `WISH_PHOTO_BUCKET` to a private S3 bucket name and `WISH_PHOTO_REGION`
+to its AWS region in the API environment. Both values are required for
+uploads and the cleanup worker. The API uses the AWS SDK v3 default Node.js
+credential provider chain. Use a workload IAM role or a local AWS profile
+with credentials resolved by that chain. Keep S3 public access blocked.
+Use a bucket with versioning disabled for permanent removal through normal
+cleanup. For a versioned bucket, configure a lifecycle rule for noncurrent
+versions under `wish-photos/`.
+
+Grant the API identity `s3:PutObject`, `s3:GetObject` and `s3:DeleteObject`
+on `arn:aws:s3:::YOUR_BUCKET/wish-photos/*`. If the bucket uses a
+customer-managed KMS key, allow `kms:GenerateDataKey` for upload and
+`kms:Decrypt` for reads. A frontend content security policy must allow the
+bucket endpoint for images and `blob:` for local previews. A reverse proxy must
+allow a multipart body of at least 5 MiB plus 64 KiB on the upload route.
+The API polls for committed cleanup entries every 30 seconds and reschedules
+a failed S3 deletion after one minute. Monitor recurring cleanup warnings and
+the age of due entries in `wish_photo_cleanup`.
+
+With PostgreSQL, the API and Vite running locally, open **My wishes**, select
+a JPEG, PNG or WebP and create a wish. Confirm the detail and personal card
+show the photo. As an accepted member in another browser session, verify the
+group card shows it. As the owner, replace and remove the photo from the
+detail page and reload the list. To exercise create-then-upload retry, start
+the API without the storage settings, create a wish with a file, then restart
+with the settings and use **Retry photo upload** on the same page. Automated
+coverage runs with S3 mocked using `npm run test:e2e -- --runInBand` in the
+API directory and `npm test` in the web directory.
+
+See the [AWS SDK credential provider chain](https://docs.aws.amazon.com/sdk-for-javascript/v3/developer-guide/setting-credentials-node.html)
+and [S3 signing package](https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/Package/-aws-sdk-s3-request-presigner/).

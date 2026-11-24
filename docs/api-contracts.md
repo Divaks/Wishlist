@@ -23,6 +23,7 @@ OpenAPI support.
 | `POST /groups/:groupId/members/:targetUserId/transfer-ownership` | Transfer to an existing member. Returns 204. |
 | `GET /groups/:groupId/wishes`, `GET /groups/:groupId/wishes/:memberId` | All group wishes as an array or one member's wishes as a paginated object. |
 | `GET/POST /wishlist`, `GET/PATCH/DELETE /wishlist/:id` | Personal wish list, create, read, update and delete. Delete returns 204. |
+| `PUT/DELETE /wishlist/:id/photo` | Upload, replace or remove an owned wish photo. Both methods return 204. |
 | `POST/DELETE /wishlist/:id/reserve` | Reserve another member's wish for 201 or cancel your own reservation for 204. |
 
 Protected paths use `Authorization: Bearer <accessToken>`. Nest validates
@@ -54,3 +55,29 @@ returns `isReserved`, `reservedById` and `reservedBy` following the
 excludes the viewer from the joined reserver object. Clients should use
 `reservedById` to identify their own reservation because the nested object can
 be null even when the caller holds it.
+
+
+## Wish photos
+
+`PUT /wishlist/:id/photo` accepts exactly one multipart file named `photo`.
+The API decodes JPEG, PNG and WebP based on their bytes, with a 5 MiB file
+limit and a 25-megapixel decode limit. The multipart body may include up to
+64 KiB of overhead beyond the file limit. Invalid content or fields return
+400, oversized bodies or files return 413, and missing or unowned wishes
+return 404. Uploads return 503 if storage is unconfigured or the S3 write
+fails. `DELETE /wishlist/:id/photo` is idempotent for an existing owned wish.
+
+All wish responses include `photoUrl`, a presigned S3 GET URL valid for up to
+five minutes, or `null` when a photo URL is unavailable. The usual ownership
+and accepted group membership checks apply before signing. Pending or removed
+members receive no fresh URLs through that group. Previously issued URLs
+can continue working until they expire or the S3 object is deleted.
+The response exposes the URL through `photoUrl` only. The JSON create and
+edit payloads retain the separate product `link` and photo changes use
+the multipart and delete routes.
+
+## Wish currency
+
+Wish responses include `currency`. JSON create and update requests accept `UAH`,
+`EUR` or `USD`. Omission defaults to `UAH` on creation and preserves the
+stored currency on update. Changing currency leaves the numeric price as entered.

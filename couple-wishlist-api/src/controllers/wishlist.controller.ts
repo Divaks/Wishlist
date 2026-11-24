@@ -4,6 +4,9 @@ import {
   Post,
   Delete,
   Patch,
+  Put,
+  UploadedFile,
+  UseInterceptors,
   Body,
   Param,
   UseGuards,
@@ -11,6 +14,8 @@ import {
   HttpStatus,
   Query,
 } from "@nestjs/common";
+import { FileInterceptor } from "@nestjs/platform-express";
+import { wishPhotoUploadOptions } from "../wish-photo-upload";
 import { WishIdPipe } from "../wish-id.pipe";
 import { WishlistService } from "../services/wishlist.service";
 import { UpdateWishlistDto } from "../dto/wishlist/update-wishlist.dto";
@@ -66,6 +71,26 @@ export class WishlistController {
     @Body() dto: UpdateWishlistDto,
   ) {
     return this.wishlistService.update(userId, wishId, dto);
+  }
+
+  @Put(":id/photo")
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @UseInterceptors(FileInterceptor("photo", wishPhotoUploadOptions))
+  uploadPhoto(
+    @GetUser("userId") userId: string,
+    @Param("id", WishIdPipe) wishId: string,
+    @UploadedFile() photo?: Express.Multer.File,
+  ) {
+    return this.wishlistService.uploadPhoto(userId, wishId, photo);
+  }
+
+  @Delete(":id/photo")
+  @HttpCode(HttpStatus.NO_CONTENT)
+  removePhoto(
+    @GetUser("userId") userId: string,
+    @Param("id", WishIdPipe) wishId: string,
+  ) {
+    return this.wishlistService.removePhoto(userId, wishId);
   }
 
   @Post(":id/reserve")

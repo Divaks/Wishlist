@@ -1,3 +1,6 @@
+import { DataSource } from "typeorm";
+import { WishPhotosService } from "../../../src/services/wish-photos.service";
+import { WishPhotoStorage } from "../../../src/services/wish-photo-storage.service";
 import { Test } from "@nestjs/testing";
 import { getRepositoryToken } from "@nestjs/typeorm";
 import {
@@ -45,6 +48,9 @@ describe("GroupsService", () => {
     );
     const module = await Test.createTestingModule({
       providers: [
+        WishPhotosService,
+        { provide: DataSource, useValue: {} },
+        { provide: WishPhotoStorage, useValue: {} },
         GroupsService,
         { provide: getRepositoryToken(Group), useValue: groups },
         { provide: getRepositoryToken(GroupMember), useValue: members },

@@ -1,54 +1,61 @@
+import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
+import { WishPhoto } from './wish-photo'
 import type { WishItem } from '@/types/api'
 
-const prices = new Intl.NumberFormat('uk-UA', {
-  style: 'currency',
-  currency: 'UAH',
-  currencyDisplay: 'narrowSymbol',
-  maximumFractionDigits: 2,
-  minimumFractionDigits: 0,
-})
+function priceFormat(currency: WishItem['currency']) {
+  return new Intl.NumberFormat('uk-UA', {
+    style: 'currency',
+    currency,
+    currencyDisplay: 'narrowSymbol',
+    maximumFractionDigits: 2,
+    minimumFractionDigits: 0,
+  })
+}
 
 export function WishSummary({
   wish,
   titleLink,
+  headerAction,
+  ownerName,
+  refreshPhoto,
   heading: Heading = 'h3',
 }: {
   wish: WishItem
   titleLink?: string
+  headerAction?: ReactNode
+  ownerName?: string
+  refreshPhoto: () => void
   heading?: 'h2' | 'h3'
 }) {
   const link = wish.link && /^https?:\/\//i.test(wish.link) ? wish.link : null
 
   return (
     <div className="space-y-3">
-      <div
-        aria-hidden="true"
-        className="flex size-12 items-center justify-center rounded-xl bg-secondary"
-      >
-        <svg
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          className="size-6"
-        >
-          <path d="M4 11h16v10H4zM3 7h18v4H3zM12 7v14M12 7H8a3 3 0 1 1 3-3l1 3Zm0 0h4a3 3 0 1 0-3-3l-1 3Z" />
-        </svg>
-      </div>
-      <Heading className="text-xl leading-tight font-semibold wrap-break-word">
-        {titleLink ? (
-          <Link
-            className="underline decoration-border underline-offset-4 hover:decoration-ring"
-            to={titleLink}
-          >
-            {wish.title}
-          </Link>
-        ) : (
-          wish.title
-        )}
-      </Heading>
+      <header className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <Heading className="text-xl leading-tight font-semibold wrap-break-word">
+            {titleLink ? (
+              <Link
+                className="underline decoration-border underline-offset-4 hover:decoration-ring"
+                to={titleLink}
+              >
+                {wish.title}
+              </Link>
+            ) : (
+              wish.title
+            )}
+          </Heading>
+          {ownerName && (
+            <p className="text-sm text-muted-foreground wrap-anywhere">
+              Wish by {ownerName}
+            </p>
+          )}
+        </div>
+        {headerAction}
+      </header>
+      <WishPhoto wish={wish} refresh={refreshPhoto} />
       {wish.description && (
         <p className="text-sm leading-relaxed text-foreground/85 wrap-break-word">
           {wish.description}
@@ -58,17 +65,18 @@ export function WishSummary({
         <span className="mr-1 text-sm font-normal text-muted-foreground">
           Price
         </span>{' '}
-        {prices.format(wish.price)}
+        {priceFormat(wish.currency ?? 'UAH').format(wish.price)}
       </p>
-      <div className="flex flex-wrap gap-2">
-        <span className="tag capitalize">{wish.priority} priority</span>
-        {wish.isInCart && <span className="tag">In cart</span>}
-        {wish.occasion && (
-          <span className="tag">
-            {wish.occasion} {wish.occasionDate}
-          </span>
-        )}
-      </div>
+      {Heading === 'h2' && (wish.isInCart || wish.occasion) && (
+        <div className="flex flex-wrap gap-2">
+          {wish.isInCart && <span className="tag">In cart</span>}
+          {wish.occasion && (
+            <span className="tag">
+              {wish.occasion} {wish.occasionDate}
+            </span>
+          )}
+        </div>
+      )}
       {link && (
         <Button asChild variant="outline" className="w-full">
           <a href={link} target="_blank" rel="noopener noreferrer">

@@ -23,7 +23,10 @@ privileges. Wish responses receive the viewer ID to mask reservation status from
 owners and reservation identity from other members.
 Group responses currently include member and owner emails and birthdays.
 Nested user summaries in wish responses include ID, name and birthday.
-See the [permission matrix](business-rules.md).
+Wish photos use a private bucket and short-lived signed URLs issued to the
+owner or authorized group viewers. Treat signed URLs as temporary bearer
+access and keep them out of logs. See the [permission matrix](business-rules.md)
+and [photo API contract](api-contracts.md#wish-photos).
 
 [App configuration](../couple-wishlist-api/src/configure-app.ts) enables Helmet,
 configurable CORS and strict DTO whitelisting. [AppModule](../couple-wishlist-api/src/app.module.ts)

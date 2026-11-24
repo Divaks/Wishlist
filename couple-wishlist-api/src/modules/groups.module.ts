@@ -6,9 +6,13 @@ import { Group } from "../models/group.model";
 import { GroupMember } from "../models/group-member.model";
 import { User } from "../models/user.model";
 import { WishItem } from "../models/wish-item.model";
+import { WishPhotosModule } from "./wish-photos.module";
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Group, GroupMember, User, WishItem])],
+  imports: [
+    WishPhotosModule,
+    TypeOrmModule.forFeature([Group, GroupMember, User, WishItem]),
+  ],
   controllers: [GroupsController],
   providers: [GroupsService],
   exports: [GroupsService],

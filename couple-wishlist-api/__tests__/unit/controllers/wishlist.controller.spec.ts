@@ -13,6 +13,8 @@ describe("WishlistController", () => {
     findOne: jest.fn(),
     remove: jest.fn(),
     update: jest.fn(),
+    uploadPhoto: jest.fn(),
+    removePhoto: jest.fn(),
     reserveWish: jest.fn(),
     unreserveWish: jest.fn(),
   };
@@ -68,6 +70,14 @@ describe("WishlistController", () => {
   it("update", async () => {
     await controller.update("u1", "w1", { title: "New" });
     expect(service.update).toHaveBeenCalledWith("u1", "w1", { title: "New" });
+  });
+
+  it("uses the authenticated user and parsed ID for photo changes", async () => {
+    const file = { buffer: Buffer.from("photo") } as Express.Multer.File;
+    await controller.uploadPhoto("u1", "w1", file);
+    await controller.removePhoto("u1", "w1");
+    expect(service.uploadPhoto).toHaveBeenCalledWith("u1", "w1", file);
+    expect(service.removePhoto).toHaveBeenCalledWith("u1", "w1");
   });
 
   it("reserveWish", async () => {
