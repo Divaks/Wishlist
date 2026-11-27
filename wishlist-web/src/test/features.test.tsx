@@ -1,4 +1,10 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { expect, it, vi } from 'vitest'
@@ -98,7 +104,9 @@ it('refreshes group wishes after reserve and cancel, with permissions based on t
     title: 'A camera',
     description: null,
     price: 1600,
+    currency: 'UAH',
     link: 'https://example.com/camera',
+    photoUrl: 'https://photos.example.com/group-camera?signature=group',
     priority: 'medium',
     isInCart: false,
     occasion: null,
@@ -148,7 +156,23 @@ it('refreshes group wishes after reserve and cancel, with permissions based on t
   expect(
     screen.queryByRole('button', { name: 'Save group' }),
   ).not.toBeInTheDocument()
-  await user.click(await screen.findByRole('button', { name: 'Reserve wish' }))
+  expect(
+    await screen.findByRole('img', { name: 'Photo of A camera' }),
+  ).toHaveAttribute('src', wish.photoUrl)
+  const heading = screen.getByRole('heading', { name: wish.title })
+  const image = screen.getByRole('img', { name: `Photo of ${wish.title}` })
+  const store = screen.getByRole('link', { name: /View in store/ })
+  const reserve = screen.getByRole('button', { name: 'Reserve wish' })
+  expect(heading.compareDocumentPosition(image)).toBe(
+    Node.DOCUMENT_POSITION_FOLLOWING,
+  )
+  expect(image.compareDocumentPosition(store)).toBe(
+    Node.DOCUMENT_POSITION_FOLLOWING,
+  )
+  expect(store.compareDocumentPosition(reserve)).toBe(
+    Node.DOCUMENT_POSITION_FOLLOWING,
+  )
+  await user.click(reserve)
   expect(await screen.findByText('Reserved by you')).toBeVisible()
   expect(await screen.findByText('Wish reserved')).toBeVisible()
   expect(screen.getByRole('link', { name: /View in store/ })).toHaveAttribute(
@@ -204,12 +228,15 @@ it('shows the backend conflict message and keeps the session when account deleti
 
 it('shows notifications for wish creation, failed updates, successful updates and deletion', async () => {
   let failUpdate = true
+  let saved = false
   const wish: WishItem = {
     id: 'new-wish',
     title: 'A new camera',
     description: null,
-    price: 0,
+    price: 12,
+    currency: 'EUR',
     link: null,
+    photoUrl: null,
     priority: 'medium',
     isInCart: false,
     occasion: null,
@@ -223,31 +250,60 @@ it('shows notifications for wish creation, failed updates, successful updates an
   server.use(
     http.get('*/api/wishlist/paged', () =>
       HttpResponse.json({
-        data: [],
-        total: 0,
+        data: saved ? [wish] : [],
+        total: Number(saved),
         page: 1,
         limit: 5,
-        totalPages: 0,
+        totalPages: Number(saved),
       }),
     ),
-    http.post('*/api/wishlist', () => HttpResponse.json(wish, { status: 201 })),
+    http.post('*/api/wishlist', async ({ request }) => {
+      const json: unknown = await request.json()
+      expect(json).toMatchObject({ currency: 'EUR', price: 12 })
+      expect(json).not.toHaveProperty('priority')
+      saved = true
+      return HttpResponse.json(wish, { status: 201 })
+    }),
     http.get('*/api/wishlist/new-wish', () => HttpResponse.json(wish)),
     http.patch('*/api/wishlist/new-wish', () =>
       failUpdate
         ? HttpResponse.json({ message: 'Please try again.' }, { status: 500 })
         : HttpResponse.json(wish),
     ),
-    http.delete(
-      '*/api/wishlist/new-wish',
-      () => new HttpResponse(null, { status: 204 }),
-    ),
+    http.delete('*/api/wishlist/new-wish', () => {
+      saved = false
+      return new HttpResponse(null, { status: 204 })
+    }),
   )
   const user = userEvent.setup()
   openProtectedPage('/wishlist')
   await user.type(screen.getByRole('textbox', { name: 'Title' }), wish.title)
+  await user.clear(screen.getByRole('spinbutton', { name: 'Price' }))
+  await user.type(screen.getByRole('spinbutton', { name: 'Price' }), '12')
+  await user.selectOptions(
+    screen.getByRole('combobox', { name: 'Currency' }),
+    'EUR',
+  )
+  expect(
+    screen.queryByRole('combobox', { name: 'Priority' }),
+  ).not.toBeInTheDocument()
   await user.click(screen.getByRole('button', { name: 'Create wish' }))
   expect(await screen.findByText('Wish created')).toBeVisible()
-  expect(window.location.pathname).toBe('/wishlist/new-wish')
+  expect(window.location.pathname).toBe('/wishlist')
+  expect(screen.getByRole('textbox', { name: 'Title' })).toHaveValue('')
+  expect(await screen.findByText(/12\s€/)).toBeVisible()
+  const title = await screen.findByRole('heading', { name: wish.title })
+  const deleteButton = screen.getByRole('button', {
+    name: `Delete ${wish.title}`,
+  })
+  expect(title.closest('header')).toContainElement(deleteButton)
+  expect(deleteButton.textContent).toBe('')
+  expect(screen.queryByText('medium priority')).not.toBeInTheDocument()
+
+  await user.click(await screen.findByRole('link', { name: wish.title }))
+  expect(await screen.findByRole('combobox', { name: 'Currency' })).toHaveValue(
+    'EUR',
+  )
   await user.click(await screen.findByRole('button', { name: 'Save wish' }))
   expect(await screen.findByRole('alert')).toHaveTextContent(
     'Please try again.',
@@ -258,7 +314,11 @@ it('shows notifications for wish creation, failed updates, successful updates an
   expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   const confirmation = vi.spyOn(window, 'confirm').mockReturnValue(true)
   try {
-    await user.click(screen.getByRole('button', { name: 'Delete wish' }))
+    await user.click(screen.getByRole('link', { name: 'Back to my wishes' }))
+    await user.click(
+      await screen.findByRole('button', { name: `Delete ${wish.title}` }),
+    )
+    expect(await screen.findByText('No wishes yet.')).toBeVisible()
     expect(await screen.findByText('Wish deleted')).toBeVisible()
     expect(window.location.pathname).toBe('/wishlist')
     expect(
@@ -636,7 +696,9 @@ it('hides reservation actions for own wishes and reservations made by someone el
     title: 'My gift',
     description: null,
     price: 20,
+    currency: 'UAH',
     link: null,
+    photoUrl: null,
     priority: 'medium',
     isInCart: false,
     occasion: null,
@@ -735,4 +797,111 @@ it('removes a member and refreshes the group settings', async () => {
   } finally {
     confirmation.mockRestore()
   }
+})
+
+it('keeps the saved wish after a failed photo upload and retries without creating another', async () => {
+  const wish: WishItem = {
+    id: 'photo-wish',
+    title: 'A camera with photo',
+    description: null,
+    price: 0,
+    currency: 'UAH',
+    link: null,
+    photoUrl: null,
+    priority: 'medium',
+    isInCart: false,
+    occasion: null,
+    occasionDate: null,
+    userId: profile.userId,
+    user: null,
+    isReserved: false,
+    reservedById: null,
+    reservedBy: null,
+  }
+  let creations = 0
+  let uploads = 0
+  const initialUrl = 'https://photos.example.com/camera?signature=initial'
+  const refreshedUrl = 'https://photos.example.com/camera?signature=refreshed'
+  const replacedUrl = 'https://photos.example.com/replacement?signature=initial'
+  server.use(
+    http.get('*/api/wishlist/paged', () =>
+      HttpResponse.json({
+        data: creations ? [wish] : [],
+        total: creations,
+        page: 1,
+        limit: 5,
+        totalPages: creations,
+      }),
+    ),
+    http.post('*/api/wishlist', async ({ request }) => {
+      expect(await request.json()).toMatchObject({ title: wish.title })
+      creations += 1
+      return HttpResponse.json(wish, { status: 201 })
+    }),
+    http.put('*/api/wishlist/photo-wish/photo', async ({ request }) => {
+      expect(request.headers.get('Authorization')).toBe(
+        `Bearer ${mockAccessToken}`,
+      )
+      const upload = (await request.formData()).get('photo')
+      expect(upload).toMatchObject({ size: 10, type: 'image/png' })
+      uploads += 1
+      if (uploads === 1) {
+        return HttpResponse.json({ message: 'Try again.' }, { status: 503 })
+      }
+      wish.photoUrl = uploads === 2 ? initialUrl : replacedUrl
+      return new HttpResponse(null, { status: 204 })
+    }),
+    http.get('*/api/wishlist/photo-wish', () => HttpResponse.json(wish)),
+    http.delete('*/api/wishlist/photo-wish/photo', () => {
+      wish.photoUrl = null
+      return new HttpResponse(null, { status: 204 })
+    }),
+  )
+  const user = userEvent.setup()
+  const photo = new File(['test bytes'], 'camera.png', { type: 'image/png' })
+  openProtectedPage('/wishlist')
+  await user.type(screen.getByRole('textbox', { name: 'Title' }), wish.title)
+  await user.upload(screen.getByLabelText('Wish photo (optional)'), photo)
+  expect(screen.getByAltText('Selected photo preview')).toBeVisible()
+  await user.click(screen.getByRole('button', { name: 'Create wish' }))
+  expect(await screen.findByRole('alert')).toHaveTextContent(
+    'Wish saved. Photo upload failed.',
+  )
+  expect(await screen.findByRole('link', { name: wish.title })).toBeVisible()
+  expect(
+    screen.queryByRole('button', { name: 'Create wish' }),
+  ).not.toBeInTheDocument()
+  await user.click(screen.getByRole('button', { name: 'Retry photo upload' }))
+  const imageName = `Photo of ${wish.title}`
+  const image = await screen.findByRole('img', { name: imageName })
+  expect(image).toHaveAttribute('src', initialUrl)
+  expect(creations).toBe(1)
+  expect(uploads).toBe(2)
+  expect(window.location.pathname).toBe('/wishlist')
+  await user.click(screen.getByRole('link', { name: wish.title }))
+  const detailImage = await screen.findByRole('img', { name: imageName })
+
+  wish.photoUrl = refreshedUrl
+  fireEvent.error(detailImage)
+  expect(screen.queryByRole('img', { name: imageName })).not.toBeInTheDocument()
+  const refreshed = await screen.findByRole('img', { name: imageName })
+  expect(refreshed).toHaveAttribute('src', refreshedUrl)
+  fireEvent.error(refreshed)
+  expect(screen.queryByRole('img', { name: imageName })).not.toBeInTheDocument()
+
+  await user.upload(screen.getByLabelText('Choose a replacement photo'), photo)
+  await user.click(screen.getByRole('button', { name: 'Replace photo' }))
+  expect(await screen.findByRole('img', { name: imageName })).toHaveAttribute(
+    'src',
+    replacedUrl,
+  )
+  await user.click(screen.getByRole('button', { name: 'Remove photo' }))
+  await waitFor(() =>
+    expect(
+      screen.queryByRole('img', { name: imageName }),
+    ).not.toBeInTheDocument(),
+  )
+  await user.click(screen.getByRole('link', { name: 'Back to my wishes' }))
+  expect(await screen.findByRole('link', { name: wish.title })).toBeVisible()
+  expect(screen.queryByRole('img', { name: imageName })).not.toBeInTheDocument()
 })

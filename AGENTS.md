@@ -103,5 +103,9 @@ discovery. Load only the material relevant to the task.
 - Avoid unnecessary explanations and repetition.
 - Do not narrate routine actions.
 - Report results, verification, and remaining issues.
+- In the final response, list the skills used for the task, or state that none were used.
+- In the final response, state whether you reviewed the code according to
+  `AGENTS.md` and the applicable skills. If you did not perform a review,
+  give the reason or state that it was not applicable.
 - Provide detailed explanations only when requested
   or necessary for correctness.

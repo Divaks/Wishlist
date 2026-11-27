@@ -1,4 +1,6 @@
 import { WishlistSchema1795300000000 } from "./migrations/1795300000000-wishlist-schema";
+import { WishPhotos1795300000001 } from "./migrations/1795300000001-wish-photos";
+import { WishCurrency1795300000002 } from "./migrations/1795300000002-wish-currency";
 import { Module } from "@nestjs/common";
 import { User } from "./models/user.model";
 import { WishItem } from "./models/wish-item.model";
@@ -36,7 +38,11 @@ import { HealthController } from "./controllers/health.controller";
         autoLoadEntities: true,
         entities: [User, WishItem, Group, GroupMember],
         synchronize: false,
-        migrations: [WishlistSchema1795300000000],
+        migrations: [
+          WishlistSchema1795300000000,
+          WishPhotos1795300000001,
+          WishCurrency1795300000002,
+        ],
         migrationsRun: true,
       }),
     }),

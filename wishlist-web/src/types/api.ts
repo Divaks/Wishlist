@@ -14,7 +14,9 @@ export interface WishItem {
   title: string
   description: string | null
   price: number
+  currency: WishCurrency
   link: string | null
+  photoUrl: string | null
   priority: WishPriority
   isInCart: boolean
   occasion: string | null
@@ -26,6 +28,7 @@ export interface WishItem {
   reservedBy: PublicUser | null
 }
 
+export type WishCurrency = 'UAH' | 'EUR' | 'USD'
 export type WishPriority = 'low' | 'medium' | 'high'
 
 export interface Group {
@@ -92,6 +95,7 @@ export interface CreateWishRequest {
   title: string
   description?: string | null
   price?: number
+  currency?: WishCurrency
   link?: string | null
   priority?: WishPriority
   isInCart?: boolean

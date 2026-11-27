@@ -25,6 +25,8 @@ and [UsersService](../couple-wishlist-api/src/services/users.service.ts).
 - Wish creation assigns the actor as owner. The personal wishlist endpoints
   scope read, edit and delete to the owner. Other users read through a shared
   group's wishlist routes.
+- A wish may have one uploaded photo. Only its owner can upload, replace or
+  remove it. Photo URLs follow the same visibility rules as the wish.
 - A member can reserve another member's wish if they share an active group.
   Pending invitations are insufficient. Self-reservation fails.
 - Concurrent reservations for the same available wish have one winner.

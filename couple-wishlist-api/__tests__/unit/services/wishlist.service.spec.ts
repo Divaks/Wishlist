@@ -1,3 +1,6 @@
+import { DataSource, EntityManager } from "typeorm";
+import { WishPhotosService } from "../../../src/services/wish-photos.service";
+import { WishPhotoStorage } from "../../../src/services/wish-photo-storage.service";
 import { Test } from "@nestjs/testing";
 import { getRepositoryToken } from "@nestjs/typeorm";
 import {
@@ -22,6 +25,7 @@ describe("WishlistService", () => {
   let service: WishlistService;
   let repo: MockRepository;
   let members: MockRepository;
+  let photos: WishPhotosService;
 
   beforeEach(async () => {
     jest.resetAllMocks();
@@ -32,12 +36,16 @@ describe("WishlistService", () => {
     );
     const module = await Test.createTestingModule({
       providers: [
+        WishPhotosService,
+        { provide: DataSource, useValue: {} },
+        { provide: WishPhotoStorage, useValue: {} },
         WishlistService,
         { provide: getRepositoryToken(WishItem), useValue: repo },
         { provide: getRepositoryToken(GroupMember), useValue: members },
       ],
     }).compile();
     service = module.get(WishlistService);
+    photos = module.get(WishPhotosService);
   });
 
   const pagination: PaginationDto = { page: 1, limit: 20 };
@@ -51,6 +59,7 @@ describe("WishlistService", () => {
       expect(repo.create).toHaveBeenCalledWith({
         title: "Camera",
         price: 100,
+        currency: "UAH",
         description: undefined,
         link: undefined,
         priority: "medium",
@@ -141,6 +150,52 @@ describe("WishlistService", () => {
     it("throws NotFound when wish not found", async () => {
       repo.findOne.mockResolvedValue(null);
       await expect(service.findOne("u1", "1")).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+  });
+
+  describe("photo changes", () => {
+    it("checks ownership before staging and again in the attachment transaction", async () => {
+      const upload = jest
+        .spyOn(photos, "upload")
+        .mockImplementation(async (_photo, attach) => {
+          await attach(
+            repo.transactionManager as unknown as EntityManager,
+            "key",
+          );
+        });
+      const file = { buffer: Buffer.from("photo") } as Express.Multer.File;
+
+      repo.findOne.mockResolvedValueOnce(null);
+      await expect(service.uploadPhoto("owner", "wish", file)).rejects.toThrow(
+        NotFoundException,
+      );
+      expect(upload).not.toHaveBeenCalled();
+
+      repo.findOne.mockResolvedValue({ id: "wish", userId: "owner" });
+      await service.uploadPhoto("owner", "wish", file);
+      expect(upload).toHaveBeenCalledWith(file.buffer, expect.any(Function));
+      expect(repo.transactionManager.update).toHaveBeenCalledWith(
+        WishItem,
+        { id: "wish", userId: "owner" },
+        { photoKey: "key" },
+      );
+
+      repo.transactionManager.update.mockResolvedValueOnce({ affected: 0 });
+      await expect(service.uploadPhoto("owner", "wish", file)).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it("clears the photo with an owner-scoped update", async () => {
+      await service.removePhoto("owner", "wish");
+      expect(repo.update).toHaveBeenCalledWith(
+        { id: "wish", userId: "owner" },
+        { photoKey: null },
+      );
+      repo.update.mockResolvedValueOnce({ affected: 0 });
+      await expect(service.removePhoto("other", "wish")).rejects.toThrow(
         NotFoundException,
       );
     });
