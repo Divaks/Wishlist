@@ -10,7 +10,7 @@ that covers the change you are making.
 | [API contracts](api-contracts.md) | HTTP routes, responses, errors and compatibility | [Controllers](../couple-wishlist-api/src/controllers/), [DTOs](../couple-wishlist-api/src/dto/) |
 | [Database](database.md) | Relationships, constraints, migration and locking | [Entities](../couple-wishlist-api/src/models/), [migrations](../couple-wishlist-api/src/migrations/) |
 | [Security](security.md) | Authentication, authorization and sensitive data | [Strategy](../couple-wishlist-api/src/strategies/jwt.strategy.ts), [auth provider](../wishlist-web/src/app/auth-provider.tsx) |
-| [Deployment](deployment.md) | Local environment, builds and CI | [Compose](../docker-compose.yml), [CI workflow](../.github/workflows/ci.yml) |
+| [Deployment](deployment.md) | Local environment, builds, CI and manual cloud deployment | [Compose](../docker-compose.yml), [CI workflow](../.github/workflows/ci.yml) |
 | [Git workflow](git-workflow.md) | Branch naming and pull request numbering | [Repository instructions](../AGENTS.md) |
 
 Source code is authoritative for implemented behavior. Tests verify specific

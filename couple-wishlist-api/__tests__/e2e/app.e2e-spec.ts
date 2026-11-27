@@ -11,6 +11,7 @@ describe("PostgreSQL wishlist API", () => {
   let admin: DataSource;
   let app: INestApplication;
   let created = false;
+  const originalDatabaseUrl = process.env.DATABASE_URL;
   beforeAll(async () => {
     admin = await new DataSource({
       type: "postgres",
@@ -22,6 +23,7 @@ describe("PostgreSQL wishlist API", () => {
     }).initialize();
     await admin.query('CREATE DATABASE "' + database + '"');
     created = true;
+    process.env.DATABASE_URL = "";
     process.env.DB_NAME = database;
     process.env.JWT_SECRET = randomUUID();
     const { AppModule } = await import("../../src/app.module");
@@ -33,6 +35,8 @@ describe("PostgreSQL wishlist API", () => {
     await app.init();
   }, 30000);
   afterAll(async () => {
+    if (originalDatabaseUrl === undefined) delete process.env.DATABASE_URL;
+    else process.env.DATABASE_URL = originalDatabaseUrl;
     await app?.close();
     if (created) await admin.query('DROP DATABASE "' + database + '"');
     if (admin?.isInitialized) await admin.destroy();
