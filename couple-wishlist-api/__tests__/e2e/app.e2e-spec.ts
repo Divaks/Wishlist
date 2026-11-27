@@ -300,6 +300,20 @@ describe("PostgreSQL wishlist API", () => {
       .set(other.auth)
       .expect(403);
     expect(photoStorage.url).toHaveBeenCalledTimes(signedBeforeRemoval);
+    await api()
+      .post(path + "/members/" + other.id + "/transfer-ownership")
+      .set(owner.auth)
+      .expect(404);
+    await api()
+      .post(path + "/members")
+      .set(owner.auth)
+      .send({ email: other.email })
+      .expect(201);
+    await api()
+      .post(path + "/invitations/accept")
+      .set(other.auth)
+      .expect(204);
+
     const transfers = await Promise.all(
       [winner, other].map((m) =>
         api()
