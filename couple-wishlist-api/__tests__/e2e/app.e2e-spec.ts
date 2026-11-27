@@ -18,6 +18,7 @@ describe("PostgreSQL wishlist API", () => {
   let admin: DataSource;
   let app: INestApplication;
   let created = false;
+  const originalDatabaseUrl = process.env.DATABASE_URL;
   const objects = new Set<string>();
   const photoStorage = {
     enabled: false,
@@ -49,6 +50,7 @@ describe("PostgreSQL wishlist API", () => {
     }).initialize();
     await admin.query('CREATE DATABASE "' + database + '"');
     created = true;
+    process.env.DATABASE_URL = "";
     process.env.DB_NAME = database;
     process.env.JWT_SECRET = randomUUID();
     const { AppModule } = await import("../../src/app.module");
@@ -70,6 +72,8 @@ describe("PostgreSQL wishlist API", () => {
     ]);
   }, 30000);
   afterAll(async () => {
+    if (originalDatabaseUrl === undefined) delete process.env.DATABASE_URL;
+    else process.env.DATABASE_URL = originalDatabaseUrl;
     await app?.close();
     if (created) await admin.query('DROP DATABASE "' + database + '"');
     if (admin?.isInitialized) await admin.destroy();
@@ -296,6 +300,20 @@ describe("PostgreSQL wishlist API", () => {
       .set(other.auth)
       .expect(403);
     expect(photoStorage.url).toHaveBeenCalledTimes(signedBeforeRemoval);
+    await api()
+      .post(path + "/members/" + other.id + "/transfer-ownership")
+      .set(owner.auth)
+      .expect(404);
+    await api()
+      .post(path + "/members")
+      .set(owner.auth)
+      .send({ email: other.email })
+      .expect(201);
+    await api()
+      .post(path + "/invitations/accept")
+      .set(other.auth)
+      .expect(204);
+
     const transfers = await Promise.all(
       [winner, other].map((m) =>
         api()

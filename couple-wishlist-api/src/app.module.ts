@@ -15,6 +15,7 @@ import { AuthModule } from "./modules/auth.module";
 import { WishlistModule } from "./modules/wishlist.module";
 import { GroupsModule } from "./modules/groups.module";
 import { HealthController } from "./controllers/health.controller";
+import { databaseConnection } from "./database-connection";
 
 @Module({
   imports: [
@@ -30,11 +31,7 @@ import { HealthController } from "./controllers/health.controller";
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
         type: "postgres",
-        host: config.get<string>("DB_HOST", "localhost"),
-        port: Number(config.get<string>("DB_PORT", "5432")),
-        username: config.get<string>("DB_USERNAME", "postgres"),
-        password: config.get<string>("DB_PASSWORD"),
-        database: config.get<string>("DB_NAME", "wishlist_db"),
+        ...databaseConnection(config),
         autoLoadEntities: true,
         entities: [User, WishItem, Group, GroupMember],
         synchronize: false,
