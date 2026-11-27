@@ -8,7 +8,7 @@ import type { Page } from '@/types/api'
 type ApiListProps<T> = {
   pagedPath: ApiPath
   empty: string
-  children: (items: T[]) => ReactNode
+  children: (items: T[], refresh: () => void) => ReactNode
 }
 
 export function ApiList<T>({ pagedPath, empty, children }: ApiListProps<T>) {
@@ -28,7 +28,10 @@ export function ApiList<T>({ pagedPath, empty, children }: ApiListProps<T>) {
           return (
             <>
               {items.length ? (
-                children(items)
+                children(
+                  items,
+                  () => void query.refetch({ cancelRefetch: false }),
+                )
               ) : (
                 <p className="empty-state">{empty}</p>
               )}

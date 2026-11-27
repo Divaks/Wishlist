@@ -90,6 +90,10 @@ these changes and set the following values.
 | `JWT_SECRET` | A unique secret generated with `openssl rand -hex 32` |
 | `CORS_ORIGIN` | Exact Pages origin, for example `https://wishlist-web.pages.dev` |
 
+For photo uploads, configure the private S3 bucket and credentials in
+[Wish photo storage](#wish-photo-storage). You can deploy the rest of the app
+with both storage variables unset.
+
 Render supplies `PORT`. The API binds that port on `0.0.0.0` and runs migrations
 before serving traffic. Record the assigned Render origin, for example
 `https://wishlist-api.onrender.com`. Open that origin's `/health` endpoint
@@ -130,12 +134,59 @@ serves the SPA for direct requests to routes such as `/connection` and
 1. Confirm Render reports a healthy deploy and the public `/health` URL
    returns HTTP 200. In Neon's SQL Editor, check
    `SHOW server_version;` and `SELECT name FROM migrations;` for PostgreSQL 16
-   and `WishlistSchema1795300000000`.
+   and the migrations `WishlistSchema1795300000000`,
+   `WishPhotos1795300000001`, and `WishCurrency1795300000002`.
 2. Open **API connection** on Pages and confirm it reports a healthy API. In
    the browser network panel, check that the health request reaches the Render
    HTTPS origin with no `/api` prefix and succeeds without a CORS error.
 3. Open the Pages `/login` URL directly in a private browser window and
    reload it. Confirm the React sign-in page renders both times.
 4. Register a test account on the fresh deployment and sign in. On **My
-   wishlist**, create a wish and reload the page. Confirm the signed-in
+   wishes**, create a wish and reload the page. Confirm the signed-in
    session and saved wish are still present.
+5. If S3 is configured, create a wish with a photo, reload the page, and
+   verify the photo is still visible. Replace and remove the photo from the
+   wish detail page to check upload and cleanup.
+
+## Wish photo storage
+
+Set `WISH_PHOTO_BUCKET` to a private S3 bucket name and `WISH_PHOTO_REGION`
+to its AWS region in the API environment. Both values are required for
+uploads and the cleanup worker. The API uses the AWS SDK v3 default Node.js
+credential provider chain. Use a workload IAM role or a local AWS profile
+with credentials resolved by that chain. Keep S3 public access blocked.
+On Render, configure `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` as
+API environment secrets for a dedicated IAM identity scoped to the bucket
+permissions below. If using temporary credentials, also set
+`AWS_SESSION_TOKEN` and refresh the credentials before expiration. Keep all
+AWS credentials on Render. The app stores photos in S3 and photo metadata in
+PostgreSQL, so photo uploads work with Render Free's ephemeral filesystem.
+[Render environment variables](https://render.com/docs/configure-environment-variables) ·
+[Render Free service limits](https://render.com/docs/free)
+
+Use a bucket with versioning disabled for permanent removal through normal
+cleanup. For a versioned bucket, configure a lifecycle rule for noncurrent
+versions under `wish-photos/`.
+
+Grant the API identity `s3:PutObject`, `s3:GetObject` and `s3:DeleteObject`
+on `arn:aws:s3:::YOUR_BUCKET/wish-photos/*`. If the bucket uses a
+customer-managed KMS key, allow `kms:GenerateDataKey` for upload and
+`kms:Decrypt` for reads. A frontend content security policy must allow the
+bucket endpoint for images and `blob:` for local previews. A reverse proxy must
+allow a multipart body of at least 5 MiB plus 64 KiB on the upload route.
+The API polls for committed cleanup entries every 30 seconds and reschedules
+a failed S3 deletion after one minute. Monitor recurring cleanup warnings and
+the age of due entries in `wish_photo_cleanup`.
+
+With PostgreSQL, the API and Vite running locally, open **My wishes**, select
+a JPEG, PNG or WebP and create a wish. Confirm the detail and personal card
+show the photo. As an accepted member in another browser session, verify the
+group card shows it. As the owner, replace and remove the photo from the
+detail page and reload the list. To exercise create-then-upload retry, start
+the API without the storage settings, create a wish with a file, then restart
+with the settings and use **Retry photo upload** on the same page. Automated
+coverage runs with S3 mocked using `npm run test:e2e -- --runInBand` in the
+API directory and `npm test` in the web directory.
+
+See the [AWS SDK credential provider chain](https://docs.aws.amazon.com/sdk-for-javascript/v3/developer-guide/setting-credentials-node.html)
+and [S3 signing package](https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/Package/-aws-sdk-s3-request-presigner/).

@@ -15,6 +15,7 @@ import { CreateGroupDto } from "../dto/groups/create-group.dto";
 import { UpdateGroupDto } from "../dto/groups/update-group.dto";
 import { PaginationDto, PaginatedResult } from "../dto/common/pagination.dto";
 import { WishResponseDto } from "../dto/wishlist/wish-response.dto";
+import { WishPhotosService } from "./wish-photos.service";
 
 @Injectable()
 export class GroupsService {
@@ -27,6 +28,7 @@ export class GroupsService {
     private readonly userRepository: Repository<User>,
     @InjectRepository(WishItem)
     private readonly wishRepository: Repository<WishItem>,
+    private readonly photos: WishPhotosService,
   ) {}
 
   async create(userId: string, dto: CreateGroupDto): Promise<Group> {
@@ -241,7 +243,9 @@ export class GroupsService {
 
     const [data, total] = await qb.getManyAndCount();
 
-    const mappedData = data.map((wish) => new WishResponseDto(wish, userId));
+    const mappedData = await Promise.all(
+      data.map((wish) => this.photos.response(wish, userId)),
+    );
     return new PaginatedResult(mappedData, total, page, limit);
   }
 
@@ -271,7 +275,9 @@ export class GroupsService {
       take: limit,
     });
 
-    const mappedData = data.map((wish) => new WishResponseDto(wish, userId));
+    const mappedData = await Promise.all(
+      data.map((wish) => this.photos.response(wish, userId)),
+    );
     return new PaginatedResult(mappedData, total, page, limit);
   }
 

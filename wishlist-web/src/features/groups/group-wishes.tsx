@@ -55,21 +55,21 @@ export function GroupWishes({
         pagedPath={memberId ? `${path}/${memberId}` : `${path}/paged`}
         empty="No wishes here yet."
       >
-        {(items) => (
+        {(items, refreshPhoto) => (
           <ul className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
             {items.map((wish) => (
               <li key={wish.id} className="item-card flex flex-col">
-                <p className="rounded-lg bg-secondary px-3 py-2 text-base wrap-anywhere">
-                  <span className="text-sm">Wish by</span>{' '}
-                  <span className="font-bold">
-                    {wish.user?.name ||
-                      group.members.find(
-                        (member) => member.userId === wish.userId,
-                      )?.user.email ||
-                      'a member'}
-                  </span>
-                </p>
-                <WishSummary wish={wish} />
+                <WishSummary
+                  wish={wish}
+                  refreshPhoto={refreshPhoto}
+                  ownerName={
+                    wish.user?.name ||
+                    group.members.find(
+                      (member) => member.userId === wish.userId,
+                    )?.user.email ||
+                    'a member'
+                  }
+                />
                 {wish.userId !== userId && (
                   <div className="mt-auto flex flex-wrap items-center gap-2 border-t pt-3">
                     {wish.isReserved && (

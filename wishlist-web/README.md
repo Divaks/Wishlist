@@ -59,7 +59,7 @@ Vite exposes `VITE_*` variables to browser code. For deployment, configure the h
 
 The shared color tokens and DM Sans typography are configured in `src/index.css`. The header theme button switches between light and dark themes and saves the choice in `wishlist.theme` in localStorage. Without a saved choice, the theme follows the system preference. The initial theme is applied in `index.html` before the app renders. The gift image lives in `src/assets/`, and the font license notices live in `public/font-licenses/`. The shadcn/ui configuration lives in `components.json`, with Button, Input, Card and Label source in `src/components/ui/`.
 
-Wish cards display prices in UAH and open store links in a new tab. The current API supplies no currency, image, or category fields, so cards use a generic gift icon instead of product previews.
+Wish cards show prices in the selected currency (UAH, EUR or USD) and open store links in a new tab. New wishes appear on **My wishes**, where owners can delete a wish with the trash icon next to its title. Cards and wish details show an uploaded photo when available and use the gift icon as a fallback. Owners can select and preview a photo during creation, then replace or remove it from wish details. If the initial upload fails, retry it from the saved-wish notice. See [wish photo storage](../docs/deployment.md#wish-photo-storage) for API setup and verification.
 
 ## Routes
 

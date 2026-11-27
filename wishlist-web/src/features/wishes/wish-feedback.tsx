@@ -3,10 +3,14 @@ import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 
 interface WishFeedbackProps {
+  successTitle?: string
   action: { isPending: boolean; isSuccess: boolean; error: Error | null }
 }
 
-export function WishFeedback({ action }: WishFeedbackProps) {
+export function WishFeedback({
+  action,
+  successTitle = 'Wish updated',
+}: WishFeedbackProps) {
   const location = useLocation()
   const navigate = useNavigate()
   const routeState: unknown = location.state
@@ -29,7 +33,7 @@ export function WishFeedback({ action }: WishFeedbackProps) {
     : action.error
       ? 'Wish action failed'
       : action.isSuccess
-        ? 'Wish updated'
+        ? successTitle
         : notice === 'created'
           ? 'Wish created'
           : notice === 'deleted'
@@ -46,7 +50,11 @@ export function WishFeedback({ action }: WishFeedbackProps) {
         action.error?.message ||
         (action.isPending
           ? 'Please wait while your changes are saved.'
-          : notice === 'deleted' && !action.isSuccess
+          : (
+                action.isSuccess
+                  ? successTitle === 'Wish deleted'
+                  : notice === 'deleted'
+              )
             ? 'Your wish was deleted successfully.'
             : 'Your wish was saved successfully.')
       }

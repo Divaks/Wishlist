@@ -1,5 +1,5 @@
 import { Expose, Type } from "class-transformer";
-import { WishItem } from "../../models/wish-item.model";
+import { WishCurrency, WishItem } from "../../models/wish-item.model";
 import { UserResponseDto } from "../users/user-response.dto";
 
 export class WishResponseDto {
@@ -16,7 +16,13 @@ export class WishResponseDto {
   price: number;
 
   @Expose()
+  currency: WishCurrency;
+
+  @Expose()
   link: string | null;
+
+  @Expose()
+  photoUrl: string | null;
 
   @Expose()
   priority: string;
@@ -46,11 +52,17 @@ export class WishResponseDto {
 
   isReserved: boolean;
 
-  constructor(wish: WishItem, viewerId?: string) {
+  constructor(
+    wish: WishItem,
+    viewerId?: string,
+    photoUrl: string | null = null,
+  ) {
+    this.photoUrl = photoUrl;
     this.id = wish.id;
     this.title = wish.title;
     this.description = wish.description;
     this.price = Number(wish.price);
+    this.currency = wish.currency ?? WishCurrency.UAH;
     this.link = wish.link;
     this.priority = wish.priority;
     this.isInCart = wish.isInCart;
